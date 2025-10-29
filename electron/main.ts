@@ -230,7 +230,7 @@ async function createWindow(): Promise<void> {
     opacity: 1.0,  // Start with full opacity
     backgroundColor: "#00000000",
     focusable: true,
-    skipTaskbar: true,
+    skipTaskbar: false, // Show in Dock so user can easily quit
     type: "panel",
     paintWhenInitiallyHidden: true,
     titleBarStyle: "hidden",
@@ -308,23 +308,26 @@ async function createWindow(): Promise<void> {
     return { action: "allow" };
   })
 
-  // Enhanced screen capture resistance
-  state.mainWindow.setContentProtection(true)
+  // Enhanced screen capture resistance (disable when showing window)
+  // state.mainWindow.setContentProtection(true) // Will be set when needed
 
   state.mainWindow.setVisibleOnAllWorkspaces(true, {
     visibleOnFullScreen: true
   })
   state.mainWindow.setAlwaysOnTop(true, "screen-saver", 1)
 
-  // Additional screen capture resistance settings
+  // Additional screen capture settings for macOS
   if (process.platform === "darwin") {
-    // Prevent window from being captured in screenshots
-    state.mainWindow.setHiddenInMissionControl(true)
+    // Keep visible in Mission Control and App Switcher
+    state.mainWindow.setHiddenInMissionControl(false)
     state.mainWindow.setWindowButtonVisibility(false)
     state.mainWindow.setBackgroundColor("#00000000")
 
-    // Prevent window from being included in window switcher
-    state.mainWindow.setSkipTaskbar(true)
+    // Show in Dock so user can easily quit the application
+    state.mainWindow.setSkipTaskbar(false)
+    if (app.dock) {
+      app.dock.show()
+    }
 
     // Disable window shadow
     state.mainWindow.setHasShadow(false)
@@ -353,15 +356,16 @@ async function createWindow(): Promise<void> {
   console.log(`Initial opacity from config: ${savedOpacity}`);
   
   // Always make sure window is shown first
-  state.mainWindow.showInactive(); // Use showInactive for consistency
-  
   if (savedOpacity <= 0.1) {
     console.log('Initial opacity too low, setting to 0 and hiding window');
     state.mainWindow.setOpacity(0);
+    state.mainWindow.hide();
     state.isWindowVisible = false;
   } else {
     console.log(`Setting initial opacity to ${savedOpacity}`);
     state.mainWindow.setOpacity(savedOpacity);
+    state.mainWindow.show();
+    state.mainWindow.focus();
     state.isWindowVisible = true;
   }
 }
@@ -394,7 +398,9 @@ function hideMainWindow(): void {
     state.windowPosition = { x: bounds.x, y: bounds.y };
     state.windowSize = { width: bounds.width, height: bounds.height };
     state.mainWindow.setIgnoreMouseEvents(true, { forward: true });
+    state.mainWindow.setContentProtection(true); // Enable when hiding
     state.mainWindow.setOpacity(0);
+    state.mainWindow.hide(); // Actually hide the window
     state.isWindowVisible = false;
     console.log('Window hidden, opacity set to 0');
   }
@@ -402,32 +408,62 @@ function hideMainWindow(): void {
 
 function showMainWindow(): void {
   if (!state.mainWindow?.isDestroyed()) {
-    if (state.windowPosition && state.windowSize) {
+    // Ensure window is on primary screen first
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const workArea = primaryDisplay.workAreaSize;
+    const bounds = state.mainWindow.getBounds();
+    
+    // If window is off-screen or invalid position, reset to center
+    if (bounds.x < -bounds.width || bounds.x > workArea.width || 
+        bounds.y < -bounds.height || bounds.y > workArea.height ||
+        !state.windowPosition) {
+      const windowWidth = state.windowSize?.width || 800;
+      const windowHeight = state.windowSize?.height || 600;
+      const centerX = Math.floor(workArea.width / 2 - windowWidth / 2);
+      const centerY = 50;
+      state.mainWindow.setPosition(centerX, centerY);
+      console.log(`Window repositioned to center: ${centerX}, ${centerY}`);
+    } else if (state.windowPosition && state.windowSize) {
       state.mainWindow.setBounds({
         ...state.windowPosition,
         ...state.windowSize
       });
     }
+    
+    // Configure window properties for visibility BEFORE showing
     state.mainWindow.setIgnoreMouseEvents(false);
-    state.mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
     state.mainWindow.setVisibleOnAllWorkspaces(true, {
       visibleOnFullScreen: true
     });
-    state.mainWindow.setContentProtection(true);
-    state.mainWindow.setOpacity(0); // Set opacity to 0 before showing
-    state.mainWindow.showInactive(); // Use showInactive instead of show+focus
-    state.mainWindow.setOpacity(1); // Then set opacity to 1 after showing
+    state.mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
+    
+    // Disable content protection completely when showing (don't re-enable immediately)
+    state.mainWindow.setContentProtection(false);
+    
+    // Set opacity to 1.0 and show the window
+    state.mainWindow.setOpacity(1.0);
+    state.mainWindow.show();
+    state.mainWindow.focus();
+    
+    // Bring to front forcefully
+    state.mainWindow.moveTop();
+    
+    // Log window position for debugging
+    const finalBounds = state.mainWindow.getBounds();
+    console.log(`Window shown: position (${finalBounds.x}, ${finalBounds.y}), size ${finalBounds.width}x${finalBounds.height}, opacity: ${state.mainWindow.getOpacity()}`);
+    
     state.isWindowVisible = true;
-    console.log('Window shown with showInactive(), opacity set to 1');
   }
 }
 
 function toggleMainWindow(): void {
-  console.log(`Toggling window. Current state: ${state.isWindowVisible ? 'visible' : 'hidden'}`);
-  if (state.isWindowVisible) {
-    hideMainWindow();
-  } else {
-    showMainWindow();
+  if (!state.mainWindow?.isDestroyed()) {
+    console.log(`Toggling window. Current state: ${state.isWindowVisible ? 'visible' : 'hidden'}`);
+    if (state.isWindowVisible) {
+      hideMainWindow();
+    } else {
+      showMainWindow();
+    }
   }
 }
 
@@ -504,6 +540,13 @@ function loadEnvVariables() {
 
 // Initialize application
 async function initializeApp() {
+  // Set app name for macOS (visible in Force Quit and Activity Monitor)
+  app.setName("Int");
+  app.setAboutPanelOptions({
+    applicationName: "Int",
+    applicationVersion: "1.0.19"
+  });
+  
   try {
     // Set custom cache directory to prevent permission issues
     const appDataPath = path.join(app.getPath('appData'), 'interview-coder-v1')
@@ -519,9 +562,28 @@ async function initializeApp() {
     }
     
     app.setPath('userData', appDataPath)
-    app.setPath('sessionData', sessionPath)      
+    // Do not set unsupported 'sessionData'; pre-create expected subdirectories instead
     app.setPath('temp', tempPath)
     app.setPath('cache', cachePath)
+
+    // Pre-create Chromium session cache structure to avoid cache errors
+    // Chromium uses both appDataPath directly and sessionPath for cache
+    const sharedDictCacheSession = path.join(sessionPath, 'Shared Dictionary', 'cache')
+    const httpCacheDataSession = path.join(sessionPath, 'Cache', 'Cache_Data')
+    const sharedDictCacheAppData = path.join(appDataPath, 'Shared Dictionary', 'cache')
+    const httpCacheDataAppData = path.join(appDataPath, 'Cache', 'Cache_Data')
+    
+    for (const dir of [
+      sessionPath, 
+      sharedDictCacheSession, 
+      httpCacheDataSession,
+      sharedDictCacheAppData,
+      httpCacheDataAppData
+    ]) {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true })
+      }
+    }
       
     loadEnvVariables()
     

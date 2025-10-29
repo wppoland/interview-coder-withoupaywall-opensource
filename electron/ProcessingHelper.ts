@@ -713,6 +713,14 @@ export class ProcessingHelper {
         throw new Error("No problem info available");
       }
 
+      // Type assertion for problemInfo
+      const problem = problemInfo as {
+        problem_statement?: string;
+        constraints?: string;
+        example_input?: string;
+        example_output?: string;
+      };
+
       // Update progress status
       if (mainWindow) {
         mainWindow.webContents.send("processing-status", {
@@ -726,16 +734,16 @@ export class ProcessingHelper {
 Generate a detailed solution for the following coding problem:
 
 PROBLEM STATEMENT:
-${problemInfo.problem_statement}
+${problem.problem_statement || "No problem statement provided."}
 
 CONSTRAINTS:
-${problemInfo.constraints || "No specific constraints provided."}
+${problem.constraints || "No specific constraints provided."}
 
 EXAMPLE INPUT:
-${problemInfo.example_input || "No example input provided."}
+${problem.example_input || "No example input provided."}
 
 EXAMPLE OUTPUT:
-${problemInfo.example_output || "No example output provided."}
+${problem.example_output || "No example output provided."}
 
 LANGUAGE: ${language}
 
@@ -987,6 +995,14 @@ Your solution should be efficient, well-commented, and handle edge cases.
         throw new Error("No problem info available");
       }
 
+      // Type assertion for problemInfo
+      const problem = problemInfo as {
+        problem_statement?: string;
+        constraints?: string;
+        example_input?: string;
+        example_output?: string;
+      };
+
       // Update progress status
       if (mainWindow) {
         mainWindow.webContents.send("processing-status", {
@@ -1036,7 +1052,7 @@ If you include code examples, use proper markdown code blocks with language spec
             content: [
               {
                 type: "text" as const, 
-                text: `I'm solving this coding problem: "${problemInfo.problem_statement}" in ${language}. I need help with debugging or improving my solution. Here are screenshots of my code, the errors or test cases. Please provide a detailed analysis with:
+                text: `I'm solving this coding problem: "${problem.problem_statement || "coding problem"}" in ${language}. I need help with debugging or improving my solution. Here are screenshots of my code, the errors or test cases. Please provide a detailed analysis with:
 1. What issues you found in my code
 2. Specific improvements and corrections
 3. Any optimizations that would make the solution better
@@ -1077,7 +1093,7 @@ If you include code examples, use proper markdown code blocks with language spec
           const debugPrompt = `
 You are a coding interview assistant helping debug and improve solutions. Analyze these screenshots which include either error messages, incorrect outputs, or test cases, and provide detailed debugging help.
 
-I'm solving this coding problem: "${problemInfo.problem_statement}" in ${language}. I need help with debugging or improving my solution.
+I'm solving this coding problem: "${problem.problem_statement || "coding problem"}" in ${language}. I need help with debugging or improving my solution.
 
 YOUR RESPONSE MUST FOLLOW THIS EXACT STRUCTURE WITH THESE SECTION HEADERS:
 ### Issues Identified
@@ -1158,7 +1174,7 @@ If you include code examples, use proper markdown code blocks with language spec
           const debugPrompt = `
 You are a coding interview assistant helping debug and improve solutions. Analyze these screenshots which include either error messages, incorrect outputs, or test cases, and provide detailed debugging help.
 
-I'm solving this coding problem: "${problemInfo.problem_statement}" in ${language}. I need help with debugging or improving my solution.
+I'm solving this coding problem: "${problem.problem_statement || "coding problem"}" in ${language}. I need help with debugging or improving my solution.
 
 YOUR RESPONSE MUST FOLLOW THIS EXACT STRUCTURE WITH THESE SECTION HEADERS:
 ### Issues Identified

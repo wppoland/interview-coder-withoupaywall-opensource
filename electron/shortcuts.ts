@@ -111,6 +111,19 @@ export class ShortcutsHelper {
       app.quit()
     })
 
+    // Emergency hard-exit shortcut (kills the process even if Electron is stuck)
+    globalShortcut.register("CommandOrControl+Shift+Q", () => {
+      console.log("Command/Ctrl + Shift + Q pressed. Forcing process exit.")
+      try {
+        // Attempt graceful quit first
+        app.exit(0)
+      } catch (e) {
+        // Fallback to hard exit
+        // eslint-disable-next-line no-process-exit
+        process.exit(0)
+      }
+    })
+
     // Adjust opacity shortcuts
     globalShortcut.register("CommandOrControl+[", () => {
       console.log("Command/Ctrl + [ pressed. Decreasing opacity.")
