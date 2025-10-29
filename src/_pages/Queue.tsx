@@ -95,7 +95,6 @@ const Queue: React.FC<QueueProps> = ({
       window.electronAPI.onResetView(() => refetch()),
       window.electronAPI.onDeleteLastScreenshot(async () => {
         if (screenshots.length > 0) {
-          const lastScreenshot = screenshots[screenshots.length - 1];
           await handleDeleteScreenshot(screenshots.length - 1);
           // Toast removed as requested
         } else {

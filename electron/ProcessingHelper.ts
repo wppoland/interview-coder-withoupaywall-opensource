@@ -1,10 +1,9 @@
 // ProcessingHelper.ts
 import fs from "node:fs"
-import path from "node:path"
 import { ScreenshotHelper } from "./ScreenshotHelper"
 import { IProcessingHelperDeps } from "./main"
 import * as axios from "axios"
-import { app, BrowserWindow, dialog } from "electron"
+import { BrowserWindow } from "electron"
 import { OpenAI } from "openai"
 import { configHelper } from "./ConfigHelper"
 import Anthropic from '@anthropic-ai/sdk';
@@ -29,18 +28,6 @@ interface GeminiResponse {
       }>;
     };
     finishReason: string;
-  }>;
-}
-interface AnthropicMessage {
-  role: 'user' | 'assistant';
-  content: Array<{
-    type: 'text' | 'image';
-    text?: string;
-    source?: {
-      type: 'base64';
-      media_type: string;
-      data: string;
-    };
   }>;
 }
 export class ProcessingHelper {
@@ -313,11 +300,7 @@ export class ProcessingHelper {
           result.data
         )
         this.deps.setView("solutions")
-      } catch (error: any) {
-        mainWindow.webContents.send(
-          this.deps.PROCESSING_EVENTS.INITIAL_SOLUTION_ERROR,
-          error
-        )
+      } catch (error: unknown) {
         console.error("Processing error:", error)
         if (axios.isCancel(error)) {
           mainWindow.webContents.send(
@@ -325,9 +308,10 @@ export class ProcessingHelper {
             "Processing was canceled by the user."
           )
         } else {
+          const err = error as { message?: string };
           mainWindow.webContents.send(
             this.deps.PROCESSING_EVENTS.INITIAL_SOLUTION_ERROR,
-            error.message || "Server error. Please try again."
+            err.message || "Server error. Please try again."
           )
         }
         // Reset view back to queue on error
@@ -420,16 +404,17 @@ export class ProcessingHelper {
             result.error
           )
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (axios.isCancel(error)) {
           mainWindow.webContents.send(
             this.deps.PROCESSING_EVENTS.DEBUG_ERROR,
             "Extra processing was canceled by the user."
           )
         } else {
+          const err = error as { message?: string };
           mainWindow.webContents.send(
             this.deps.PROCESSING_EVENTS.DEBUG_ERROR,
-            error.message
+            err.message || "Unknown error"
           )
         }
       } finally {
@@ -613,16 +598,17 @@ export class ProcessingHelper {
           const responseText = (response.content[0] as { type: 'text', text: string }).text;
           const jsonText = responseText.replace(/```json|```/g, '').trim();
           problemInfo = JSON.parse(jsonText);
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("Error using Anthropic API:", error);
+          const err = error as { status?: number; message?: string };
 
           // Add specific handling for Claude's limitations
-          if (error.status === 429) {
+          if (err.status === 429) {
             return {
               success: false,
               error: "Claude API rate limit exceeded. Please wait a few minutes before trying again."
             };
-          } else if (error.status === 413 || (error.message && error.message.includes("token"))) {
+          } else if (err.status === 413 || (err.message && err.message.includes("token"))) {
             return {
               success: false,
               error: "Your screenshots contain too much information for Claude to process. Switch to OpenAI or Gemini in settings which can handle larger inputs."
@@ -679,7 +665,7 @@ export class ProcessingHelper {
       }
 
       return { success: false, error: "Failed to process screenshots" };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If the request was cancelled, don't retry
       if (axios.isCancel(error)) {
         return {
@@ -688,18 +674,20 @@ export class ProcessingHelper {
         };
       }
       
+      const err = error as { response?: { status?: number }; message?: string };
+      
       // Handle OpenAI API errors specifically
-      if (error?.response?.status === 401) {
+      if (err?.response?.status === 401) {
         return {
           success: false,
           error: "Invalid OpenAI API key. Please check your settings."
         };
-      } else if (error?.response?.status === 429) {
+      } else if (err?.response?.status === 429) {
         return {
           success: false,
           error: "OpenAI API rate limit exceeded or insufficient credits. Please try again later."
         };
-      } else if (error?.response?.status === 500) {
+      } else if (err?.response?.status === 500) {
         return {
           success: false,
           error: "OpenAI server error. Please try again later."
@@ -709,7 +697,7 @@ export class ProcessingHelper {
       console.error("API Error Details:", error);
       return { 
         success: false, 
-        error: error.message || "Failed to process screenshots. Please try again." 
+        error: err.message || "Failed to process screenshots. Please try again." 
       };
     }
   }
@@ -865,16 +853,17 @@ Your solution should be efficient, well-commented, and handle edge cases.
           });
 
           responseContent = (response.content[0] as { type: 'text', text: string }).text;
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("Error using Anthropic API for solution:", error);
+          const err = error as { status?: number; message?: string };
 
           // Add specific handling for Claude's limitations
-          if (error.status === 429) {
+          if (err.status === 429) {
             return {
               success: false,
               error: "Claude API rate limit exceeded. Please wait a few minutes before trying again."
             };
-          } else if (error.status === 413 || (error.message && error.message.includes("token"))) {
+          } else if (err.status === 413 || (err.message && err.message.includes("token"))) {
             return {
               success: false,
               error: "Your screenshots contain too much information for Claude to process. Switch to OpenAI or Gemini in settings which can handle larger inputs."
@@ -957,7 +946,7 @@ Your solution should be efficient, well-commented, and handle edge cases.
       };
 
       return { success: true, data: formattedResponse };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (axios.isCancel(error)) {
         return {
           success: false,
@@ -965,12 +954,14 @@ Your solution should be efficient, well-commented, and handle edge cases.
         };
       }
       
-      if (error?.response?.status === 401) {
+      const err = error as { response?: { status?: number }; message?: string };
+      
+      if (err?.response?.status === 401) {
         return {
           success: false,
           error: "Invalid OpenAI API key. Please check your settings."
         };
-      } else if (error?.response?.status === 429) {
+      } else if (err?.response?.status === 429) {
         return {
           success: false,
           error: "OpenAI API rate limit exceeded or insufficient credits. Please try again later."
@@ -978,7 +969,7 @@ Your solution should be efficient, well-commented, and handle edge cases.
       }
       
       console.error("Solution generation error:", error);
-      return { success: false, error: error.message || "Failed to generate solution" };
+      return { success: false, error: err.message || "Failed to generate solution" };
     }
   }
 
@@ -1223,16 +1214,17 @@ If you include code examples, use proper markdown code blocks with language spec
           });
           
           debugContent = (response.content[0] as { type: 'text', text: string }).text;
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("Error using Anthropic API for debugging:", error);
+          const err = error as { status?: number; message?: string };
           
           // Add specific handling for Claude's limitations
-          if (error.status === 429) {
+          if (err.status === 429) {
             return {
               success: false,
               error: "Claude API rate limit exceeded. Please wait a few minutes before trying again."
             };
-          } else if (error.status === 413 || (error.message && error.message.includes("token"))) {
+          } else if (err.status === 413 || (err.message && err.message.includes("token"))) {
             return {
               success: false,
               error: "Your screenshots contain too much information for Claude to process. Switch to OpenAI or Gemini in settings which can handle larger inputs."
@@ -1284,9 +1276,10 @@ If you include code examples, use proper markdown code blocks with language spec
       };
 
       return { success: true, data: response };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Debug processing error:", error);
-      return { success: false, error: error.message || "Failed to process debug request" };
+      const err = error as { message?: string };
+      return { success: false, error: err.message || "Failed to process debug request" };
     }
   }
 

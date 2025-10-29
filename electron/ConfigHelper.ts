@@ -126,7 +126,7 @@ export class ConfigHelper extends EventEmitter {
   }
 
   /**
-   * Save configuration to disk
+   * Save configuration to disk with EIO error handling
    */
   public saveConfig(config: Config): void {
     try {
@@ -135,8 +135,34 @@ export class ConfigHelper extends EventEmitter {
       if (!fs.existsSync(configDir)) {
         fs.mkdirSync(configDir, { recursive: true });
       }
-      // Write the config file
-      fs.writeFileSync(this.configPath, JSON.stringify(config, null, 2));
+      // Write the config file with retry logic for EIO errors
+      try {
+        fs.writeFileSync(this.configPath, JSON.stringify(config, null, 2));
+      } catch (writeError: unknown) {
+        const err = writeError as { code?: string; message?: string };
+        // Handle EIO (Input/Output error) - often occurs with removable drives or network filesystems
+        if (err.code === 'EIO') {
+          console.warn("EIO error writing config file, retrying with temporary file approach");
+          // Try writing to a temporary file first, then rename (atomic operation)
+          const tempPath = `${this.configPath}.tmp`;
+          try {
+            fs.writeFileSync(tempPath, JSON.stringify(config, null, 2), { flag: 'w' });
+            fs.renameSync(tempPath, this.configPath);
+          } catch (retryError) {
+            console.error("Error saving config even with retry:", retryError);
+            // Clean up temp file if it exists
+            try {
+              if (fs.existsSync(tempPath)) {
+                fs.unlinkSync(tempPath);
+              }
+            } catch (cleanupError) {
+              console.error("Error cleaning up temp config file:", cleanupError);
+            }
+          }
+        } else {
+          throw writeError;
+        }
+      }
     } catch (err) {
       console.error("Error saving config:", err);
     }
@@ -325,20 +351,21 @@ export class ConfigHelper extends EventEmitter {
       // Make a simple API call to test the key
       await openai.models.list();
       return { valid: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('OpenAI API key test failed:', error);
+      const err = error as { status?: number; message?: string };
       
       // Determine the specific error type for better error messages
       let errorMessage = 'Unknown error validating OpenAI API key';
       
-      if (error.status === 401) {
+      if (err.status === 401) {
         errorMessage = 'Invalid API key. Please check your OpenAI key and try again.';
-      } else if (error.status === 429) {
+      } else if (err.status === 429) {
         errorMessage = 'Rate limit exceeded. Your OpenAI API key has reached its request limit or has insufficient quota.';
-      } else if (error.status === 500) {
+      } else if (err.status === 500) {
         errorMessage = 'OpenAI server error. Please try again later.';
-      } else if (error.message) {
-        errorMessage = `Error: ${error.message}`;
+      } else if (err.message) {
+        errorMessage = `Error: ${err.message}`;
       }
       
       return { valid: false, error: errorMessage };
@@ -358,12 +385,13 @@ export class ConfigHelper extends EventEmitter {
         return { valid: true };
       }
       return { valid: false, error: 'Invalid Gemini API key format.' };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Gemini API key test failed:', error);
+      const err = error as { message?: string };
       let errorMessage = 'Unknown error validating Gemini API key';
       
-      if (error.message) {
-        errorMessage = `Error: ${error.message}`;
+      if (err.message) {
+        errorMessage = `Error: ${err.message}`;
       }
       
       return { valid: false, error: errorMessage };
@@ -383,12 +411,13 @@ export class ConfigHelper extends EventEmitter {
         return { valid: true };
       }
       return { valid: false, error: 'Invalid Anthropic API key format.' };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Anthropic API key test failed:', error);
+      const err = error as { message?: string };
       let errorMessage = 'Unknown error validating Anthropic API key';
       
-      if (error.message) {
-        errorMessage = `Error: ${error.message}`;
+      if (err.message) {
+        errorMessage = `Error: ${err.message}`;
       }
       
       return { valid: false, error: errorMessage };

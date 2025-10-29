@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen, shell, ipcMain } from "electron"
+import { app, BrowserWindow, screen, shell, type BrowserWindowConstructorOptions } from "electron"
 import path from "path"
 import fs from "fs"
 import { initializeIpcHandlers } from "./ipcHandlers"
@@ -32,7 +32,7 @@ const state = {
 
   // View and state management
   view: "queue" as "queue" | "solutions" | "debug",
-  problemInfo: null as any,
+  problemInfo: null as unknown,
   hasDebugged: false,
 
   // Processing events
@@ -57,8 +57,8 @@ export interface IProcessingHelperDeps {
   getMainWindow: () => BrowserWindow | null
   getView: () => "queue" | "solutions" | "debug"
   setView: (view: "queue" | "solutions" | "debug") => void
-  getProblemInfo: () => any
-  setProblemInfo: (info: any) => void
+  getProblemInfo: () => unknown
+  setProblemInfo: (info: unknown) => void
   getScreenshotQueue: () => string[]
   getExtraScreenshotQueue: () => string[]
   clearQueues: () => void
@@ -178,7 +178,7 @@ const gotTheLock = app.requestSingleInstanceLock()
 if (!gotTheLock) {
   app.quit()
 } else {
-  app.on("second-instance", (event, commandLine) => {
+  app.on("second-instance", (_event, _commandLine) => {
     // Someone tried to run a second instance, we should focus our window.
     if (state.mainWindow) {
       if (state.mainWindow.isMinimized()) state.mainWindow.restore()
@@ -206,7 +206,7 @@ async function createWindow(): Promise<void> {
   state.step = 60
   state.currentY = 50
 
-  const windowSettings: Electron.BrowserWindowConstructorOptions = {
+  const windowSettings: BrowserWindowConstructorOptions = {
     width: 800,
     height: 600,
     minWidth: 750,
@@ -630,11 +630,11 @@ function getScreenshotHelper(): ScreenshotHelper | null {
   return state.screenshotHelper
 }
 
-function getProblemInfo(): any {
+function getProblemInfo(): unknown {
   return state.problemInfo
 }
 
-function setProblemInfo(problemInfo: any): void {
+function setProblemInfo(problemInfo: unknown): void {
   state.problemInfo = problemInfo
 }
 

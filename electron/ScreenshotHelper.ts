@@ -7,7 +7,6 @@ import { v4 as uuidv4 } from "uuid";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import screenshot from "screenshot-desktop";
-import os from "os";
 
 const execFileAsync = promisify(execFile);
 
@@ -105,6 +104,62 @@ export class ScreenshotHelper {
     } catch (err) {
       console.error("Error cleaning screenshot directories:", err);
     }
+  }
+
+  /**
+   * Safely write a file with EIO error handling and retry logic
+   */
+  private async safeWriteFile(filePath: string, data: Buffer): Promise<void> {
+    const maxRetries = 3;
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // Try direct write first
+        await fs.promises.writeFile(filePath, data);
+        return; // Success
+      } catch (error: unknown) {
+        const err = error as { code?: string; message?: string };
+        lastError = error as Error;
+
+        // Handle EIO (Input/Output error) - often occurs with removable drives or network filesystems
+        if (err.code === 'EIO') {
+          if (attempt < maxRetries - 1) {
+            // Wait before retry (exponential backoff)
+            await new Promise((resolve) => setTimeout(resolve, 100 * (attempt + 1)));
+            console.warn(`EIO error writing file (attempt ${attempt + 1}/${maxRetries}), retrying...`);
+            
+            // Try with temporary file approach (atomic operation)
+            try {
+              const tempPath = `${filePath}.tmp`;
+              await fs.promises.writeFile(tempPath, data);
+              await fs.promises.rename(tempPath, filePath);
+              return; // Success with temp file
+            } catch (tempError) {
+              // Clean up temp file if it exists
+              try {
+                const tempPath = `${filePath}.tmp`;
+                if (fs.existsSync(tempPath)) {
+                  await fs.promises.unlink(tempPath);
+                }
+              } catch (cleanupError) {
+                console.warn("Error cleaning up temp file:", cleanupError);
+              }
+              // Continue to next retry
+              continue;
+            }
+          } else {
+            console.error(`EIO error writing file after ${maxRetries} attempts:`, err);
+          }
+        } else {
+          // For non-EIO errors, throw immediately
+          throw error;
+        }
+      }
+    }
+
+    // If we get here, all retries failed
+    throw lastError || new Error('Failed to write file after multiple attempts');
   }
 
   public getView(): "queue" | "solutions" | "debug" {
@@ -267,19 +322,12 @@ export class ScreenshotHelper {
       } catch (psError) {
         console.warn("Windows PowerShell screenshot failed:", psError);
 
-        // Method 3: Last resort - create a tiny placeholder image
+        // Method 3: Last resort - all methods failed
         console.log(
-          "All screenshot methods failed, creating placeholder image"
+          "All screenshot methods failed"
         );
 
-        // Create a 1x1 transparent PNG as fallback
-        const fallbackBuffer = Buffer.from(
-          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
-          "base64"
-        );
-        console.log("Created placeholder image as fallback");
-
-        // Show the error but return a valid buffer so the app doesn't crash
+        // Show the error - no fallback buffer needed as we're throwing
         throw new Error(
           "Could not capture screenshot with any method. Please check your Windows security settings and try again."
         );
@@ -314,7 +362,8 @@ export class ScreenshotHelper {
         if (!fs.existsSync(screenshotDir)) {
           fs.mkdirSync(screenshotDir, { recursive: true });
         }
-        await fs.promises.writeFile(screenshotPath, screenshotBuffer);
+        // Write with retry for EIO errors
+        await this.safeWriteFile(screenshotPath, screenshotBuffer);
         console.log("Adding screenshot to main queue:", screenshotPath);
         this.screenshotQueue.push(screenshotPath);
         if (this.screenshotQueue.length > this.MAX_SCREENSHOTS) {
@@ -338,7 +387,8 @@ export class ScreenshotHelper {
         if (!fs.existsSync(screenshotDir)) {
           fs.mkdirSync(screenshotDir, { recursive: true });
         }
-        await fs.promises.writeFile(screenshotPath, screenshotBuffer);
+        // Write with retry for EIO errors
+        await this.safeWriteFile(screenshotPath, screenshotBuffer);
         console.log("Adding screenshot to extra queue:", screenshotPath);
         this.extraScreenshotQueue.push(screenshotPath);
         if (this.extraScreenshotQueue.length > this.MAX_SCREENSHOTS) {

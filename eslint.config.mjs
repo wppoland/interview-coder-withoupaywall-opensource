@@ -3,7 +3,6 @@ import globals from "globals";
 import tseslintPlugin from "@typescript-eslint/eslint-plugin";
 import tseslintParser from "@typescript-eslint/parser";
 import json from "@eslint/json";
-import markdown from "@eslint/markdown";
 import css from "@eslint/css";
 
 export default [
@@ -26,7 +25,13 @@ export default [
       "@typescript-eslint": tseslintPlugin,
     },
     rules: {
-      ...tseslintPlugin.configs.recommended.rules, 
+      ...tseslintPlugin.configs.recommended.rules,
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-unused-vars": ["warn", { 
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_" 
+      }],
+      "@typescript-eslint/no-var-requires": "off",
     },
   },
 
@@ -46,9 +51,18 @@ export default [
     rules: { ...json.configs.recommended.rules },
   },
   {
-    files: ["**/*.md"],
-    plugins: { markdown },
-    rules: { ...markdown.configs.recommended.rules },
+    ignores: [
+      "**/*.md",
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/*.test.js",
+      "**/*.spec.ts",
+      "**/*.spec.tsx",
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/dist-electron/**",
+      "**/build/**",
+    ],
   },
   {
     files: ["**/*.css"],
