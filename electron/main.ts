@@ -547,6 +547,15 @@ async function initializeApp() {
     applicationVersion: "1.0.19"
   });
   
+  // Ensure the app does NOT auto-start on login/wake (macOS)
+  if (process.platform === 'darwin') {
+    try {
+      app.setLoginItemSettings({ openAtLogin: false, openAsHidden: false });
+    } catch (e) {
+      console.warn('Could not set login item settings:', e);
+    }
+  }
+  
   try {
     // Set custom cache directory to prevent permission issues
     const appDataPath = path.join(app.getPath('appData'), 'interview-coder-v1')
