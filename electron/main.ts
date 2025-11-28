@@ -232,9 +232,9 @@ async function createWindow(): Promise<void> {
   state.step = 60
   state.currentY = 50
 
-  // Calculate 1/4 of screen size
-  const windowWidth = Math.floor(workArea.width / 4)
-  const windowHeight = Math.floor(workArea.height / 4)
+  // Calculate 1/2 of screen size
+  const windowWidth = Math.floor(workArea.width / 2)
+  const windowHeight = Math.floor(workArea.height / 2)
 
   const windowSettings: BrowserWindowConstructorOptions = {
     width: windowWidth,

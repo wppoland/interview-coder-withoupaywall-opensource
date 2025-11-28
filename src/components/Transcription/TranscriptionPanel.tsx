@@ -8,6 +8,7 @@ interface TranscriptionPanelProps {
   onStart: () => void
   onStop: () => void
   onClear: () => void
+  onSelectLanguage: () => void
   language: "pl-PL" | "en-US"
 }
 
@@ -17,10 +18,11 @@ export function TranscriptionPanel({
   onStart,
   onStop,
   onClear,
+  onSelectLanguage,
   language
 }: TranscriptionPanelProps) {
   return (
-    <div className="bg-black/40 border-l border-white/10 h-full flex flex-col">
+    <div className="bg-black border-l border-white/10 h-full flex flex-col">
       <div className="p-3 border-b border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />

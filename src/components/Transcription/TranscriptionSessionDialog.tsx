@@ -19,12 +19,9 @@ export function TranscriptionSessionDialog({
   const { showToast } = useToast()
 
   const handleStart = () => {
+    console.log('TranscriptionSessionDialog: Starting session with language:', selectedLanguage)
     onStartSession(selectedLanguage)
-    showToast(
-      "Sesja rozpoczęta",
-      `Transkrypcja w języku ${selectedLanguage === "pl-PL" ? "polskim" : "angielskim"}`,
-      "success"
-    )
+    // Don't show toast here - it will be shown when listening actually starts
     onClose()
   }
 
