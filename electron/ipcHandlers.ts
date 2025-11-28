@@ -13,7 +13,14 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
   })
 
   ipcMain.handle("update-config", (_event, updates) => {
-    return configHelper.updateConfig(updates);
+    const result = configHelper.updateConfig(updates);
+    // If opacity was updated, apply it immediately to the window
+    if (updates.opacity !== undefined && deps.getMainWindow() && !deps.getMainWindow()?.isDestroyed()) {
+      const opacity = Math.max(0.1, Math.min(1.0, updates.opacity));
+      deps.getMainWindow()?.setOpacity(opacity);
+      console.log(`Window opacity updated to ${opacity}`);
+    }
+    return result;
   })
 
   ipcMain.handle("check-api-key", () => {

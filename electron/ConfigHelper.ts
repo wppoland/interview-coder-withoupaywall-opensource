@@ -25,7 +25,7 @@ export class ConfigHelper extends EventEmitter {
     solutionModel: "gemini-2.0-flash",
     debuggingModel: "gemini-2.0-flash",
     language: "python",
-    opacity: 1.0,
+    opacity: 0.95, // Start with 95% opacity
     transcriptionLanguage: "en-US"  // Default to English
   };
 

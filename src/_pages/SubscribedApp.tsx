@@ -44,10 +44,11 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
     // Clear previous transcript
     clearTranscript()
     window.electronAPI.clearTranscript().catch(console.error)
-    // Start listening
+    // Start listening after language is updated
+    // Use a longer delay to ensure language is updated in the hook
     setTimeout(() => {
       startListening()
-    }, 100)
+    }, 300)
   }
   
   // Handle session stop

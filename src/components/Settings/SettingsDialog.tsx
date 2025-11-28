@@ -185,6 +185,7 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
   const [solutionModel, setSolutionModel] = useState("gpt-4o");
   const [debuggingModel, setDebuggingModel] = useState("gpt-4o");
   const [transcriptionLanguage, setTranscriptionLanguage] = useState<"pl-PL" | "en-US">("en-US");
+  const [opacity, setOpacity] = useState(0.95);
   const [isLoading, setIsLoading] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const { showToast } = useToast();
@@ -216,6 +217,7 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
         solutionModel?: string;
         debuggingModel?: string;
         transcriptionLanguage?: "pl-PL" | "en-US";
+        opacity?: number;
       }
 
       window.electronAPI
@@ -227,6 +229,7 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
           setSolutionModel(config.solutionModel || "gpt-4o");
           setDebuggingModel(config.debuggingModel || "gpt-4o");
           setTranscriptionLanguage(config.transcriptionLanguage || "en-US");
+          setOpacity(config.opacity !== undefined ? config.opacity : 0.95);
         })
         .catch((error: unknown) => {
           console.error("Failed to load config:", error);
@@ -268,6 +271,7 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
         solutionModel,
         debuggingModel,
         transcriptionLanguage,
+        opacity,
       });
       
       if (result) {
@@ -562,6 +566,37 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
               <p className="text-xs text-white/60 mb-1">• Press <span className="font-mono text-white/90">Cmd+Shift+M</span> to reply to the last question in the transcript</p>
               <p className="text-xs text-white/60">• Make sure microphone permissions are enabled in System Settings</p>
             </div>
+          </div>
+          
+          <div className="space-y-2 mt-4">
+            <label htmlFor="opacity" className="text-sm font-medium text-white mb-2 block">
+              Window Opacity: {Math.round(opacity * 100)}%
+            </label>
+            <input
+              id="opacity"
+              type="range"
+              min="0.1"
+              max="1.0"
+              step="0.05"
+              value={opacity}
+              onChange={(e) => {
+                const newOpacity = parseFloat(e.target.value);
+                setOpacity(newOpacity);
+                // Update opacity in real-time without reload
+                window.electronAPI.updateConfig({ opacity: newOpacity }).catch(console.error);
+              }}
+              className="w-full h-2 bg-black/50 rounded-lg appearance-none cursor-pointer opacity-slider"
+              style={{
+                background: `linear-gradient(to right, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.1) ${(opacity - 0.1) / 0.9 * 100}%, rgba(255,255,255,0.05) ${(opacity - 0.1) / 0.9 * 100}%, rgba(255,255,255,0.05) 100%)`
+              }}
+            />
+            <div className="flex justify-between text-xs text-white/50">
+              <span>10%</span>
+              <span>100%</span>
+            </div>
+            <p className="text-xs text-white/50">
+              Adjust the transparency of the window. Changes apply immediately.
+            </p>
           </div>
           
           <div className="space-y-4 mt-4">

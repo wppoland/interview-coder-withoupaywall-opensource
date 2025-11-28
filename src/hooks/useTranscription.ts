@@ -187,12 +187,19 @@ export function useTranscription(transcriptionLanguage: 'pl-PL' | 'en-US' = 'en-
     if (recognitionRef.current && !isListening) {
       try {
         shouldRestartRef.current = true
+        // Ensure language is set before starting
         recognitionRef.current.lang = languageRef.current
+        console.log(`Starting speech recognition with language: ${languageRef.current}`)
         recognitionRef.current.start()
       } catch (e) {
         console.error('Failed to start listening:', e)
         setError('Failed to start listening')
       }
+    } else if (!recognitionRef.current) {
+      console.error('Speech recognition not initialized')
+      setError('Speech recognition not initialized')
+    } else if (isListening) {
+      console.log('Already listening')
     }
   }, [isListening])
 

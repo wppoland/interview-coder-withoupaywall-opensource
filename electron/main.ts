@@ -232,9 +232,13 @@ async function createWindow(): Promise<void> {
   state.step = 60
   state.currentY = 50
 
+  // Calculate 1/4 of screen size
+  const windowWidth = Math.floor(workArea.width / 4)
+  const windowHeight = Math.floor(workArea.height / 4)
+
   const windowSettings: BrowserWindowConstructorOptions = {
-    width: 800,
-    height: 600,
+    width: windowWidth,
+    height: windowHeight,
     minWidth: 400,
     minHeight: 300,
     maxWidth: undefined, // Allow resizing to any width
@@ -255,7 +259,7 @@ async function createWindow(): Promise<void> {
     transparent: true,
     fullscreenable: false,
     hasShadow: false,
-    opacity: 1.0,  // Start with full opacity
+    opacity: 0.95,  // Start with 95% opacity (will be overridden by config)
     backgroundColor: "#00000000",
     focusable: true,
     skipTaskbar: false, // Show in Dock so user can easily quit
@@ -463,8 +467,10 @@ function showMainWindow(): void {
     // Disable content protection completely when showing (don't re-enable immediately)
     state.mainWindow.setContentProtection(false);
     
-    // Set opacity to 1.0 and show the window
-    state.mainWindow.setOpacity(1.0);
+    // Set opacity from config and show the window
+    const savedOpacity = configHelper.getOpacity();
+    const finalOpacity = savedOpacity > 0.1 ? savedOpacity : 0.95;
+    state.mainWindow.setOpacity(finalOpacity);
     state.mainWindow.show();
     state.mainWindow.focus();
     
@@ -666,6 +672,18 @@ async function initializeApp() {
     }
     
     initializeHelpers()
+    
+    // Listen for config updates to update window opacity in real-time
+    configHelper.on('config-updated', (newConfig) => {
+      if (newConfig.opacity !== undefined && state.mainWindow && !state.mainWindow.isDestroyed()) {
+        const opacity = Math.max(0.1, Math.min(1.0, newConfig.opacity));
+        state.mainWindow.setOpacity(opacity);
+        console.log(`Window opacity updated to ${opacity}`);
+      }
+    });
+    
+    // Also listen for opacity changes specifically (even if config-updated is not emitted)
+    // We'll handle this in the updateConfig handler
     initializeIpcHandlers({
       getMainWindow,
       setWindowDimensions,
