@@ -340,11 +340,12 @@ export class ScreenshotHelper {
     showMainWindow: () => void
   ): Promise<string> {
     console.log("Taking screenshot in view:", this.view);
-    hideMainWindow();
+    // Window stays visible - no need to hide/show
+    // hideMainWindow(); // Disabled - window always visible
 
-    // Increased delay for window hiding on Windows
-    const hideDelay = process.platform === "win32" ? 500 : 300;
-    await new Promise((resolve) => setTimeout(resolve, hideDelay));
+    // No delay needed since window stays visible
+    // const hideDelay = process.platform === "win32" ? 500 : 300;
+    // await new Promise((resolve) => setTimeout(resolve, hideDelay));
 
     let screenshotPath = "";
     try {

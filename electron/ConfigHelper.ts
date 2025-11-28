@@ -13,6 +13,7 @@ interface Config {
   debuggingModel: string;
   language: string;
   opacity: number;
+  transcriptionLanguage: "pl-PL" | "en-US";  // Language for speech recognition
 }
 
 export class ConfigHelper extends EventEmitter {
@@ -24,7 +25,8 @@ export class ConfigHelper extends EventEmitter {
     solutionModel: "gemini-2.0-flash",
     debuggingModel: "gemini-2.0-flash",
     language: "python",
-    opacity: 1.0
+    opacity: 1.0,
+    transcriptionLanguage: "en-US"  // Default to English
   };
 
   constructor() {
@@ -229,7 +231,8 @@ export class ConfigHelper extends EventEmitter {
       // This prevents re-initializing the AI client when only opacity changes
       if (updates.apiKey !== undefined || updates.apiProvider !== undefined || 
           updates.extractionModel !== undefined || updates.solutionModel !== undefined || 
-          updates.debuggingModel !== undefined || updates.language !== undefined) {
+          updates.debuggingModel !== undefined || updates.language !== undefined ||
+          updates.transcriptionLanguage !== undefined) {
         this.emit('config-updated', newConfig);
       }
       

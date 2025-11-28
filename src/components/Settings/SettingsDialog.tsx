@@ -184,6 +184,7 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
   const [extractionModel, setExtractionModel] = useState("gpt-4o");
   const [solutionModel, setSolutionModel] = useState("gpt-4o");
   const [debuggingModel, setDebuggingModel] = useState("gpt-4o");
+  const [transcriptionLanguage, setTranscriptionLanguage] = useState<"pl-PL" | "en-US">("en-US");
   const [isLoading, setIsLoading] = useState(false);
   const { showToast } = useToast();
 
@@ -213,6 +214,7 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
         extractionModel?: string;
         solutionModel?: string;
         debuggingModel?: string;
+        transcriptionLanguage?: "pl-PL" | "en-US";
       }
 
       window.electronAPI
@@ -223,6 +225,7 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
           setExtractionModel(config.extractionModel || "gpt-4o");
           setSolutionModel(config.solutionModel || "gpt-4o");
           setDebuggingModel(config.debuggingModel || "gpt-4o");
+          setTranscriptionLanguage(config.transcriptionLanguage || "en-US");
         })
         .catch((error: unknown) => {
           console.error("Failed to load config:", error);
@@ -263,6 +266,7 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
         extractionModel,
         solutionModel,
         debuggingModel,
+        transcriptionLanguage,
       });
       
       if (result) {
@@ -496,8 +500,29 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
                 
                 <div className="text-white/70">Zoom In</div>
                 <div className="text-white/90 font-mono">Ctrl+= / Cmd+=</div>
+                
+                <div className="text-white/70">Reply to Question</div>
+                <div className="text-white/90 font-mono">Ctrl+Shift+M / Cmd+Shift+M</div>
               </div>
             </div>
+          </div>
+          
+          <div className="space-y-2 mt-4">
+            <label htmlFor="transcriptionLanguage" className="text-sm font-medium text-white mb-2 block">
+              Transcription Language
+            </label>
+            <select
+              id="transcriptionLanguage"
+              value={transcriptionLanguage}
+              onChange={(e) => setTranscriptionLanguage(e.target.value as "pl-PL" | "en-US")}
+              className="w-full bg-black/50 border border-white/10 text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white/20"
+            >
+              <option value="en-US">English (en-US)</option>
+              <option value="pl-PL">Polish (pl-PL)</option>
+            </select>
+            <p className="text-xs text-white/50">
+              Select the language for speech recognition. The app will transcribe and answer questions in this language.
+            </p>
           </div>
           
           <div className="space-y-4 mt-4">

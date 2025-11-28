@@ -235,7 +235,27 @@ const electronAPI = {
       ipcRenderer.removeListener("delete-last-screenshot", subscription)
     }
   },
-  deleteLastScreenshot: () => ipcRenderer.invoke("delete-last-screenshot")
+  deleteLastScreenshot: () => ipcRenderer.invoke("delete-last-screenshot"),
+  
+  // Transcription methods
+  appendTranscript: (text: string) => ipcRenderer.invoke("append-transcript", text),
+  clearTranscript: () => ipcRenderer.invoke("clear-transcript"),
+  getTranscript: () => ipcRenderer.invoke("get-transcript"),
+  replyToQuestion: () => ipcRenderer.invoke("reply-to-question"),
+  onTranscriptionReply: (callback: (data: { answer: string }) => void) => {
+    const subscription = (_: unknown, data: { answer: string }) => callback(data)
+    ipcRenderer.on("transcription-reply", subscription)
+    return () => {
+      ipcRenderer.removeListener("transcription-reply", subscription)
+    }
+  },
+  onTranscriptionReplyError: (callback: (data: { error: string }) => void) => {
+    const subscription = (_: unknown, data: { error: string }) => callback(data)
+    ipcRenderer.on("transcription-reply-error", subscription)
+    return () => {
+      ipcRenderer.removeListener("transcription-reply-error", subscription)
+    }
+  }
 }
 
 // Before exposing the API

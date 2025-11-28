@@ -5,6 +5,7 @@ import { initializeIpcHandlers } from "./ipcHandlers"
 import { ProcessingHelper } from "./ProcessingHelper"
 import { ScreenshotHelper } from "./ScreenshotHelper"
 import { ShortcutsHelper } from "./shortcuts"
+import { TranscriptionHelper } from "./TranscriptionHelper"
 import { initAutoUpdater } from "./autoUpdater"
 import { configHelper } from "./ConfigHelper"
 import * as dotenv from "dotenv"
@@ -29,6 +30,7 @@ const state = {
   screenshotHelper: null as ScreenshotHelper | null,
   shortcutsHelper: null as ShortcutsHelper | null,
   processingHelper: null as ProcessingHelper | null,
+  transcriptionHelper: null as TranscriptionHelper | null,
 
   // View and state management
   view: "queue" as "queue" | "solutions" | "debug",
@@ -97,6 +99,7 @@ export interface IIpcHandlerDeps {
   ) => Promise<{ success: boolean; error?: string }>
   getImagePreview: (filepath: string) => Promise<string>
   processingHelper: ProcessingHelper | null
+  transcriptionHelper: TranscriptionHelper | null
   PROCESSING_EVENTS: typeof state.PROCESSING_EVENTS
   takeScreenshot: () => Promise<string>
   getView: () => "queue" | "solutions" | "debug"
@@ -113,6 +116,23 @@ export interface IIpcHandlerDeps {
 function initializeHelpers() {
   state.screenshotHelper = new ScreenshotHelper(state.view)
   state.processingHelper = new ProcessingHelper({
+    getScreenshotHelper,
+    getMainWindow,
+    getView,
+    setView,
+    getProblemInfo,
+    setProblemInfo,
+    getScreenshotQueue,
+    getExtraScreenshotQueue,
+    clearQueues,
+    takeScreenshot,
+    getImagePreview,
+    deleteScreenshot,
+    setHasDebugged,
+    getHasDebugged,
+    PROCESSING_EVENTS: state.PROCESSING_EVENTS
+  } as IProcessingHelperDeps)
+  state.transcriptionHelper = new TranscriptionHelper({
     getScreenshotHelper,
     getMainWindow,
     getView,
@@ -182,7 +202,10 @@ if (!gotTheLock) {
     // Someone tried to run a second instance, we should focus our window.
     if (state.mainWindow) {
       if (state.mainWindow.isMinimized()) state.mainWindow.restore()
+      state.mainWindow.show()
       state.mainWindow.focus()
+      state.mainWindow.moveTop()
+      state.isWindowVisible = true
 
       // Protocol handler removed - no longer using auth callbacks
     }
@@ -350,24 +373,17 @@ async function createWindow(): Promise<void> {
   state.currentY = bounds.y
   state.isWindowVisible = true
   
-  // Set opacity based on user preferences or hide initially
-  // Ensure the window is visible for the first launch or if opacity > 0.1
+  // Always keep window visible and listening
   const savedOpacity = configHelper.getOpacity();
   console.log(`Initial opacity from config: ${savedOpacity}`);
   
-  // Always make sure window is shown first
-  if (savedOpacity <= 0.1) {
-    console.log('Initial opacity too low, setting to 0 and hiding window');
-    state.mainWindow.setOpacity(0);
-    state.mainWindow.hide();
-    state.isWindowVisible = false;
-  } else {
-    console.log(`Setting initial opacity to ${savedOpacity}`);
-    state.mainWindow.setOpacity(savedOpacity);
-    state.mainWindow.show();
-    state.mainWindow.focus();
-    state.isWindowVisible = true;
-  }
+  // Always show the window - keep it visible all the time
+  const finalOpacity = savedOpacity > 0.1 ? savedOpacity : 1.0;
+  console.log(`Setting initial opacity to ${finalOpacity} and keeping window visible`);
+  state.mainWindow.setOpacity(finalOpacity);
+  state.mainWindow.show();
+  state.mainWindow.focus();
+  state.isWindowVisible = true;
 }
 
 function handleWindowMove(): void {
@@ -393,17 +409,8 @@ function handleWindowClosed(): void {
 
 // Window visibility functions
 function hideMainWindow(): void {
-  if (!state.mainWindow?.isDestroyed()) {
-    const bounds = state.mainWindow.getBounds();
-    state.windowPosition = { x: bounds.x, y: bounds.y };
-    state.windowSize = { width: bounds.width, height: bounds.height };
-    state.mainWindow.setIgnoreMouseEvents(true, { forward: true });
-    state.mainWindow.setContentProtection(true); // Enable when hiding
-    state.mainWindow.setOpacity(0);
-    state.mainWindow.hide(); // Actually hide the window
-    state.isWindowVisible = false;
-    console.log('Window hidden, opacity set to 0');
-  }
+  // Window should always be visible - do nothing
+  console.log('hideMainWindow called but window stays visible (always-on mode)');
 }
 
 function showMainWindow(): void {
@@ -457,13 +464,13 @@ function showMainWindow(): void {
 }
 
 function toggleMainWindow(): void {
+  // Window should always be visible - just ensure it's shown and focused
   if (!state.mainWindow?.isDestroyed()) {
-    console.log(`Toggling window. Current state: ${state.isWindowVisible ? 'visible' : 'hidden'}`);
-    if (state.isWindowVisible) {
-      hideMainWindow();
-    } else {
-      showMainWindow();
-    }
+    console.log('Toggle requested but window stays visible (always-on mode)');
+    state.mainWindow.show();
+    state.mainWindow.focus();
+    state.mainWindow.moveTop();
+    state.isWindowVisible = true;
   }
 }
 
@@ -610,6 +617,7 @@ async function initializeApp() {
       deleteScreenshot,
       getImagePreview,
       processingHelper: state.processingHelper,
+      transcriptionHelper: state.transcriptionHelper,
       PROCESSING_EVENTS: state.PROCESSING_EVENTS,
       takeScreenshot,
       getView,
@@ -656,12 +664,15 @@ app.on("open-url", (event, url) => {
 app.on("second-instance", (event, commandLine) => {
   console.log("second-instance event received:", commandLine)
   
-  // Focus or create the main window
+  // Focus or create the main window - always ensure it's visible
   if (!state.mainWindow) {
     createWindow()
   } else {
     if (state.mainWindow.isMinimized()) state.mainWindow.restore()
+    state.mainWindow.show()
     state.mainWindow.focus()
+    state.mainWindow.moveTop()
+    state.isWindowVisible = true
   }
 })
 
@@ -680,6 +691,12 @@ if (!app.requestSingleInstanceLock()) {
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
+  } else if (state.mainWindow) {
+    // Ensure window is always visible when app is activated
+    state.mainWindow.show()
+    state.mainWindow.focus()
+    state.mainWindow.moveTop()
+    state.isWindowVisible = true
   }
 })
 
@@ -725,10 +742,11 @@ function clearQueues(): void {
 
 async function takeScreenshot(): Promise<string> {
   if (!state.mainWindow) throw new Error("No main window available")
+  // Window stays visible during screenshot - pass no-op functions
   return (
     state.screenshotHelper?.takeScreenshot(
-      () => hideMainWindow(),
-      () => showMainWindow()
+      () => { /* Window stays visible */ },
+      () => { /* Window stays visible */ }
     ) || ""
   )
 }

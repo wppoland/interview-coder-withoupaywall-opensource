@@ -347,4 +347,54 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
       return { success: false, error: "Failed to delete last screenshot" }
     }
   })
+
+  // Transcription handlers
+  ipcMain.handle("append-transcript", (_event, text: string) => {
+    if (deps.transcriptionHelper) {
+      deps.transcriptionHelper.appendToTranscript(text)
+      return { success: true }
+    }
+    return { success: false, error: "Transcription helper not available" }
+  })
+
+  ipcMain.handle("clear-transcript", () => {
+    if (deps.transcriptionHelper) {
+      deps.transcriptionHelper.clearTranscript()
+      return { success: true }
+    }
+    return { success: false, error: "Transcription helper not available" }
+  })
+
+  ipcMain.handle("get-transcript", () => {
+    if (deps.transcriptionHelper) {
+      return { success: true, transcript: deps.transcriptionHelper.getTranscript() }
+    }
+    return { success: false, error: "Transcription helper not available", transcript: "" }
+  })
+
+  ipcMain.handle("reply-to-question", async () => {
+    const mainWindow = deps.getMainWindow()
+    if (!mainWindow) {
+      return { success: false, error: "Main window not available" }
+    }
+
+    if (!deps.transcriptionHelper) {
+      return { success: false, error: "Transcription helper not available" }
+    }
+
+    try {
+      const answer = await deps.transcriptionHelper.replyToQuestion()
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("transcription-reply", { answer })
+      }
+      return { success: true, answer }
+    } catch (error) {
+      console.error("Error generating reply:", error)
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("transcription-reply-error", { error: errorMessage })
+      }
+      return { success: false, error: errorMessage }
+    }
+  })
 }

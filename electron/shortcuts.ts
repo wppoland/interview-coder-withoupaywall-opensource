@@ -28,9 +28,14 @@ export class ShortcutsHelper {
       console.error('Error saving opacity to config:', error);
     }
     
-    // If we're making the window visible, also make sure it's shown and interaction is enabled
-    if (newOpacity > 0.1 && !this.deps.isVisible()) {
-      this.deps.toggleMainWindow();
+    // Window always visible - ensure it's shown and interaction is enabled
+    if (newOpacity > 0.1) {
+      const mainWindow = this.deps.getMainWindow();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.show();
+        mainWindow.focus();
+        mainWindow.setIgnoreMouseEvents(false);
+      }
     }
   }
 
@@ -102,8 +107,14 @@ export class ShortcutsHelper {
     })
 
     globalShortcut.register("CommandOrControl+B", () => {
-      console.log("Command/Ctrl + B pressed. Toggling window visibility.")
-      this.deps.toggleMainWindow()
+      console.log("Command/Ctrl + B pressed. Window stays visible (always-on mode).")
+      // Window always visible - just ensure it's focused
+      const mainWindow = this.deps.getMainWindow()
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.show()
+        mainWindow.focus()
+        mainWindow.moveTop()
+      }
     })
 
     globalShortcut.register("CommandOrControl+Q", () => {
@@ -169,6 +180,33 @@ export class ShortcutsHelper {
       if (mainWindow) {
         // Send an event to the renderer to delete the last screenshot
         mainWindow.webContents.send("delete-last-screenshot")
+      }
+    })
+    
+    // Reply to question in transcript shortcut
+    globalShortcut.register("CommandOrControl+Shift+M", async () => {
+      console.log("Command/Ctrl + Shift + M pressed. Replying to question in transcript.")
+      const mainWindow = this.deps.getMainWindow()
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        try {
+          // Trigger reply generation via IPC
+          await mainWindow.webContents.executeJavaScript(`
+            (async () => {
+              try {
+                const result = await window.electronAPI.replyToQuestion();
+                if (result.success) {
+                  console.log("Reply generated successfully");
+                } else {
+                  console.error("Failed to generate reply:", result.error);
+                }
+              } catch (error) {
+                console.error("Error generating reply:", error);
+              }
+            })()
+          `)
+        } catch (error) {
+          console.error("Error triggering reply:", error)
+        }
       }
     })
     

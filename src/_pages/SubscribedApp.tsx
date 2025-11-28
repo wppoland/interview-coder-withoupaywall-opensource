@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import Queue from "../_pages/Queue"
 import Solutions from "../_pages/Solutions"
 import { useToast } from "../contexts/toast"
+import { useTranscription } from "../hooks/useTranscription"
 
 interface SubscribedAppProps {
   credits: number
@@ -20,6 +21,45 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
   const [view, setView] = useState<"queue" | "solutions" | "debug">("queue")
   const containerRef = useRef<HTMLDivElement>(null)
   const { showToast } = useToast()
+  const [transcriptionLanguage, setTranscriptionLanguage] = useState<"pl-PL" | "en-US">("en-US")
+  
+  // Initialize transcription language from config
+  useEffect(() => {
+    window.electronAPI.getConfig().then((config: any) => {
+      if (config?.transcriptionLanguage) {
+        setTranscriptionLanguage(config.transcriptionLanguage)
+      }
+    }).catch((err: Error) => {
+      console.error("Failed to load transcription language:", err)
+    })
+  }, [])
+  
+  // Initialize transcription with selected language
+  const { transcript, error: transcriptionError } = useTranscription(transcriptionLanguage)
+  
+  // Listen for transcription reply
+  useEffect(() => {
+    const unsubscribeReply = window.electronAPI.onTranscriptionReply((data: { answer: string }) => {
+      showToast("Answer Generated", data.answer.substring(0, 100) + "...", "success")
+      console.log("Transcription reply:", data.answer)
+    })
+    
+    const unsubscribeError = window.electronAPI.onTranscriptionReplyError((data: { error: string }) => {
+      showToast("Error", data.error, "error")
+    })
+    
+    return () => {
+      unsubscribeReply()
+      unsubscribeError()
+    }
+  }, [showToast])
+  
+  // Log transcription errors
+  useEffect(() => {
+    if (transcriptionError) {
+      console.warn("Transcription error:", transcriptionError)
+    }
+  }, [transcriptionError])
 
   // Let's ensure we reset queries etc. if some electron signals happen
   useEffect(() => {
