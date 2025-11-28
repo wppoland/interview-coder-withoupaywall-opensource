@@ -21,13 +21,15 @@ interface QueueProps {
   credits: number
   currentLanguage: string
   setLanguage: (language: string) => void
+  onStartTranscriptionSession?: () => void
 }
 
 const Queue: React.FC<QueueProps> = ({
   setView,
   credits,
   currentLanguage,
-  setLanguage
+  setLanguage,
+  onStartTranscriptionSession
 }) => {
   const { showToast } = useToast()
 
@@ -37,7 +39,6 @@ const Queue: React.FC<QueueProps> = ({
 
   const {
     data: screenshots = [],
-    isLoading,
     refetch
   } = useQuery<Screenshot[]>({
     queryKey: ["screenshots"],
@@ -131,10 +132,6 @@ const Queue: React.FC<QueueProps> = ({
     setTooltipHeight(height)
   }
 
-  const handleOpenSettings = () => {
-    window.electronAPI.openSettingsPortal();
-  };
-  
   return (
     <div ref={contentRef} className={`bg-transparent w-1/2`}>
       <div className="px-4 py-3">
@@ -151,6 +148,7 @@ const Queue: React.FC<QueueProps> = ({
             credits={credits}
             currentLanguage={currentLanguage}
             setLanguage={setLanguage}
+            onStartTranscriptionSession={onStartTranscriptionSession}
           />
         </div>
       </div>

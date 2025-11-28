@@ -25,6 +25,7 @@ const state = {
   step: 0,
   currentX: 0,
   currentY: 0,
+  isManuallyResized: false, // Track if user manually resized the window
 
   // Application helpers
   screenshotHelper: null as ScreenshotHelper | null,
@@ -87,6 +88,7 @@ export interface IShortcutsHelperDeps {
   moveWindowRight: () => void
   moveWindowUp: () => void
   moveWindowDown: () => void
+  resizeWindow: (deltaWidth: number, deltaHeight: number) => void
 }
 
 export interface IIpcHandlerDeps {
@@ -170,7 +172,8 @@ function initializeHelpers() {
         )
       ),
     moveWindowUp: () => moveWindowVertical((y) => y - state.step),
-    moveWindowDown: () => moveWindowVertical((y) => y + state.step)
+    moveWindowDown: () => moveWindowVertical((y) => y + state.step),
+    resizeWindow: (deltaWidth: number, deltaHeight: number) => resizeWindow(deltaWidth, deltaHeight)
   } as IShortcutsHelperDeps)
 }
 
@@ -232,8 +235,10 @@ async function createWindow(): Promise<void> {
   const windowSettings: BrowserWindowConstructorOptions = {
     width: 800,
     height: 600,
-    minWidth: 750,
-    minHeight: 550,
+    minWidth: 400,
+    minHeight: 300,
+    maxWidth: undefined, // Allow resizing to any width
+    maxHeight: undefined, // Allow resizing to any height
     x: state.currentX,
     y: 50,
     alwaysOnTop: true,
@@ -258,7 +263,8 @@ async function createWindow(): Promise<void> {
     paintWhenInitiallyHidden: true,
     titleBarStyle: "hidden",
     enableLargerThanScreen: true,
-    movable: true
+    movable: true,
+    resizable: true // Enable window resizing
   }
 
   state.mainWindow = new BrowserWindow(windowSettings)
@@ -311,9 +317,16 @@ async function createWindow(): Promise<void> {
 
   // Configure window behavior
   state.mainWindow.webContents.setZoomFactor(1)
-  if (isDev) {
-    state.mainWindow.webContents.openDevTools()
-  }
+  
+  // Enable window dragging even without frame - make entire window draggable
+  // This will be handled via CSS in the renderer, but we ensure the window is movable
+  state.mainWindow.setMovable(true)
+  state.mainWindow.setResizable(true)
+  
+  // DevTools disabled - uncomment the line below if you need to debug
+  // if (isDev) {
+  //   state.mainWindow.webContents.openDevTools()
+  // }
   state.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     console.log("Attempting to open URL:", url)
     try {
@@ -398,6 +411,9 @@ function handleWindowResize(): void {
   if (!state.mainWindow) return
   const bounds = state.mainWindow.getBounds()
   state.windowSize = { width: bounds.width, height: bounds.height }
+  // Mark as manually resized if the size changed significantly (more than 10px difference)
+  // This prevents auto-resize from overriding user's manual resize
+  state.isManuallyResized = true
 }
 
 function handleWindowClosed(): void {
@@ -514,19 +530,60 @@ function moveWindowVertical(updateFn: (y: number) => number): void {
 }
 
 // Window dimension functions
+// This is used for automatic content-based sizing, but should not override manual resizing
 function setWindowDimensions(width: number, height: number): void {
   if (!state.mainWindow?.isDestroyed()) {
+    // Don't auto-resize if user manually resized the window
+    if (state.isManuallyResized) {
+      console.log('Skipping auto-resize - window was manually resized by user')
+      return
+    }
+    
     const [currentX, currentY] = state.mainWindow.getPosition()
     const primaryDisplay = screen.getPrimaryDisplay()
     const workArea = primaryDisplay.workAreaSize
-    const maxWidth = Math.floor(workArea.width * 0.5)
+    
+    // Don't limit width - allow full screen width if needed
+    // Only ensure it doesn't exceed screen bounds
+    const maxWidth = workArea.width - 20 // Small margin from screen edge
+    const requestedWidth = width + 32
 
     state.mainWindow.setBounds({
-      x: Math.min(currentX, workArea.width - maxWidth),
+      x: Math.min(currentX, workArea.width - Math.min(requestedWidth, maxWidth)),
       y: currentY,
-      width: Math.min(width + 32, maxWidth),
+      width: Math.min(requestedWidth, maxWidth),
       height: Math.ceil(height)
     })
+    
+    // Update state to reflect new size
+    state.windowSize = { 
+      width: Math.min(requestedWidth, maxWidth), 
+      height: Math.ceil(height) 
+    }
+  }
+}
+
+// Window resize function
+function resizeWindow(deltaWidth: number, deltaHeight: number): void {
+  if (!state.mainWindow?.isDestroyed()) {
+    const bounds = state.mainWindow.getBounds()
+    const primaryDisplay = screen.getPrimaryDisplay()
+    const workArea = primaryDisplay.workAreaSize
+    
+    const newWidth = Math.max(400, Math.min(workArea.width, bounds.width + deltaWidth))
+    const newHeight = Math.max(300, Math.min(workArea.height, bounds.height + deltaHeight))
+    
+    state.mainWindow.setBounds({
+      x: bounds.x,
+      y: bounds.y,
+      width: newWidth,
+      height: newHeight
+    })
+    
+    // Update state and mark as manually resized
+    state.windowSize = { width: newWidth, height: newHeight }
+    state.isManuallyResized = true
+    console.log(`Window resized to ${newWidth}x${newHeight}`)
   }
 }
 
@@ -782,6 +839,7 @@ export {
   showMainWindow,
   toggleMainWindow,
   setWindowDimensions,
+  resizeWindow,
   moveWindowHorizontal,
   moveWindowVertical,
   getMainWindow,

@@ -10,7 +10,7 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { Settings } from "lucide-react";
+import { Settings, Eye, EyeOff } from "lucide-react";
 import { useToast } from "../../contexts/toast";
 
 type APIProvider = "openai" | "gemini" | "anthropic";
@@ -186,6 +186,7 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
   const [debuggingModel, setDebuggingModel] = useState("gpt-4o");
   const [transcriptionLanguage, setTranscriptionLanguage] = useState<"pl-PL" | "en-US">("en-US");
   const [isLoading, setIsLoading] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
   const { showToast } = useToast();
 
   // Sync with external open state
@@ -300,20 +301,20 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent 
-        className="sm:max-w-md bg-black border border-white/10 text-white settings-dialog"
+        className="sm:max-w-2xl bg-black border border-white/10 text-white settings-dialog"
         style={{
           position: 'fixed',
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          width: 'min(450px, 90vw)',
+          width: 'min(700px, 95vw)',
           height: 'auto',
           minHeight: '400px',
           maxHeight: '90vh',
           overflowY: 'auto',
           zIndex: 9999,
           margin: 0,
-          padding: '20px',
+          padding: '24px',
           transition: 'opacity 0.25s ease, transform 0.25s ease',
           animation: 'fadeIn 0.25s ease forwards',
           opacity: 0.98
@@ -399,18 +400,37 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
              apiProvider === "gemini" ? "Gemini API Key" : 
              "Anthropic API Key"}
             </label>
-            <Input
-              id="apiKey"
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder={
-                apiProvider === "openai" ? "sk-..." : 
-                apiProvider === "gemini" ? "Enter your Gemini API key" :
-                "sk-ant-..."
-              }
-              className="bg-black/50 border-white/10 text-white"
-            />
+            <div className="relative">
+              <Input
+                id="apiKey"
+                type={showApiKey ? "text" : "password"}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder={
+                  apiProvider === "openai" ? "sk-..." : 
+                  apiProvider === "gemini" ? "Wklej tutaj swój klucz API z Google AI Studio" :
+                  "sk-ant-..."
+                }
+                className="bg-black/50 border-white/10 text-white w-full px-4 py-2 pr-10 text-sm font-mono"
+                style={{ 
+                  minHeight: '48px',
+                  wordBreak: 'break-all',
+                  overflowWrap: 'break-word'
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowApiKey(!showApiKey)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 hover:text-white/90 transition-colors"
+                title={showApiKey ? "Ukryj klucz" : "Pokaż klucz"}
+              >
+                {showApiKey ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
             {apiKey && (
               <p className="text-xs text-white/50">
                 Current: {maskApiKey(apiKey)}
@@ -503,6 +523,18 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
                 
                 <div className="text-white/70">Reply to Question</div>
                 <div className="text-white/90 font-mono">Ctrl+Shift+M / Cmd+Shift+M</div>
+                
+                <div className="text-white/70">Resize Window (Bigger)</div>
+                <div className="text-white/90 font-mono">Ctrl+Shift+= / Cmd+Shift+=</div>
+                
+                <div className="text-white/70">Resize Window (Smaller)</div>
+                <div className="text-white/90 font-mono">Ctrl+Shift+- / Cmd+Shift+-</div>
+                
+                <div className="text-white/70">Resize Width</div>
+                <div className="text-white/90 font-mono">Ctrl+Shift+Left/Right</div>
+                
+                <div className="text-white/70">Resize Height</div>
+                <div className="text-white/90 font-mono">Ctrl+Shift+Up/Down</div>
               </div>
             </div>
           </div>
@@ -520,9 +552,16 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
               <option value="en-US">English (en-US)</option>
               <option value="pl-PL">Polish (pl-PL)</option>
             </select>
-            <p className="text-xs text-white/50">
+            <p className="text-xs text-white/50 mb-2">
               Select the language for speech recognition. The app will transcribe and answer questions in this language.
             </p>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-3 mt-2">
+              <p className="text-xs text-white/80 font-medium mb-1">📢 Transcription Status:</p>
+              <p className="text-xs text-white/60 mb-1">• Transcription starts automatically when the app loads</p>
+              <p className="text-xs text-white/60 mb-1">• The app continuously listens and transcribes speech</p>
+              <p className="text-xs text-white/60 mb-1">• Press <span className="font-mono text-white/90">Cmd+Shift+M</span> to reply to the last question in the transcript</p>
+              <p className="text-xs text-white/60">• Make sure microphone permissions are enabled in System Settings</p>
+            </div>
           </div>
           
           <div className="space-y-4 mt-4">

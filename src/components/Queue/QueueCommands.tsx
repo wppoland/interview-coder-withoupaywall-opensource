@@ -11,6 +11,7 @@ interface QueueCommandsProps {
   credits: number
   currentLanguage: string
   setLanguage: (language: string) => void
+  onStartTranscriptionSession?: () => void
 }
 
 const QueueCommands: React.FC<QueueCommandsProps> = ({
@@ -18,7 +19,8 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
   screenshotCount = 0,
   credits,
   currentLanguage,
-  setLanguage
+  setLanguage,
+  onStartTranscriptionSession
 }) => {
   const [isTooltipVisible, setIsTooltipVisible] = useState(false)
   const tooltipRef = useRef<HTMLDivElement>(null)
@@ -191,6 +193,19 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Transcription Session */}
+          {onStartTranscriptionSession && (
+            <div
+              className="flex items-center gap-2 cursor-pointer rounded px-2 py-1.5 hover:bg-white/10 transition-colors"
+              onClick={onStartTranscriptionSession}
+            >
+              <span className="text-[11px] leading-none truncate">
+                Rozpocznij sesję
+              </span>
+              <div className="w-2 h-2 rounded-full bg-green-500/50" />
             </div>
           )}
 

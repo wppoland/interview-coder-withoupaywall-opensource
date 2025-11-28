@@ -5,6 +5,8 @@ import Queue from "../_pages/Queue"
 import Solutions from "../_pages/Solutions"
 import { useToast } from "../contexts/toast"
 import { useTranscription } from "../hooks/useTranscription"
+import { TranscriptionSessionDialog } from "../components/Transcription/TranscriptionSessionDialog"
+import { TranscriptionPanel } from "../components/Transcription/TranscriptionPanel"
 
 interface SubscribedAppProps {
   credits: number
@@ -21,21 +23,50 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
   const [view, setView] = useState<"queue" | "solutions" | "debug">("queue")
   const containerRef = useRef<HTMLDivElement>(null)
   const { showToast } = useToast()
-  const [transcriptionLanguage, setTranscriptionLanguage] = useState<"pl-PL" | "en-US">("en-US")
+  const [transcriptionLanguage, setTranscriptionLanguage] = useState<"pl-PL" | "en-US">("pl-PL")
+  const [showSessionDialog, setShowSessionDialog] = useState(false)
+  const [sessionActive, setSessionActive] = useState(false)
   
-  // Initialize transcription language from config
+  // Initialize transcription with selected language (but don't start automatically)
+  const { 
+    transcript, 
+    error: transcriptionError, 
+    isListening, 
+    startListening, 
+    stopListening, 
+    clearTranscript 
+  } = useTranscription(transcriptionLanguage, false)
+  
+  // Handle session start
+  const handleStartSession = (language: "pl-PL" | "en-US") => {
+    setTranscriptionLanguage(language)
+    setSessionActive(true)
+    // Clear previous transcript
+    clearTranscript()
+    window.electronAPI.clearTranscript().catch(console.error)
+    // Start listening
+    setTimeout(() => {
+      startListening()
+    }, 100)
+  }
+  
+  // Handle session stop
+  const handleStopSession = () => {
+    stopListening()
+    setSessionActive(false)
+    showToast("Sesja zakończona", "Transkrypcja została zatrzymana", "success")
+  }
+  
+  // Show toast when transcription starts (only when session is active)
   useEffect(() => {
-    window.electronAPI.getConfig().then((config: any) => {
-      if (config?.transcriptionLanguage) {
-        setTranscriptionLanguage(config.transcriptionLanguage)
-      }
-    }).catch((err: Error) => {
-      console.error("Failed to load transcription language:", err)
-    })
-  }, [])
-  
-  // Initialize transcription with selected language
-  const { transcript, error: transcriptionError } = useTranscription(transcriptionLanguage)
+    if (isListening && sessionActive) {
+      showToast(
+        "Sesja rozpoczęta", 
+        `Transkrypcja w języku ${transcriptionLanguage === "pl-PL" ? "polskim" : "angielskim"}. Naciśnij Cmd+Shift+M aby odpowiedzieć na pytania.`, 
+        "success"
+      )
+    }
+  }, [isListening, transcriptionLanguage, sessionActive, showToast])
   
   // Listen for transcription reply
   useEffect(() => {
@@ -54,12 +85,25 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
     }
   }, [showToast])
   
-  // Log transcription errors
+  // Log transcription errors and show user-friendly messages
   useEffect(() => {
     if (transcriptionError) {
       console.warn("Transcription error:", transcriptionError)
+      if (transcriptionError.includes("not supported")) {
+        showToast(
+          "Transcription Not Available", 
+          "Speech recognition is not supported in this browser. Please use Chrome or Edge.", 
+          "error"
+        )
+      } else if (transcriptionError.includes("permission") || transcriptionError.includes("microphone")) {
+        showToast(
+          "Microphone Permission Required", 
+          "Please enable microphone access in System Settings > Privacy & Security > Microphone", 
+          "error"
+        )
+      }
     }
-  }, [transcriptionError])
+  }, [transcriptionError, showToast])
 
   // Let's ensure we reset queries etc. if some electron signals happen
   useEffect(() => {
@@ -175,23 +219,52 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
   }, [view])
 
   return (
-    <div ref={containerRef} className="min-h-0">
-      {view === "queue" ? (
-        <Queue
-          setView={setView}
-          credits={credits}
-          currentLanguage={currentLanguage}
-          setLanguage={setLanguage}
-        />
-      ) : view === "solutions" ? (
-        <Solutions
-          setView={setView}
-          credits={credits}
-          currentLanguage={currentLanguage}
-          setLanguage={setLanguage}
-        />
-      ) : null}
-    </div>
+    <>
+      <TranscriptionSessionDialog
+        open={showSessionDialog}
+        onStartSession={handleStartSession}
+        onClose={() => setShowSessionDialog(false)}
+      />
+      
+      <div ref={containerRef} className="h-full flex overflow-hidden">
+        {/* Main content area */}
+        <div className="flex-1 min-w-0 overflow-auto">
+          {view === "queue" ? (
+            <Queue
+              setView={setView}
+              credits={credits}
+              currentLanguage={currentLanguage}
+              setLanguage={setLanguage}
+              onStartTranscriptionSession={() => setShowSessionDialog(true)}
+            />
+          ) : view === "solutions" ? (
+            <Solutions
+              setView={setView}
+              credits={credits}
+              currentLanguage={currentLanguage}
+              setLanguage={setLanguage}
+            />
+          ) : null}
+        </div>
+        
+        {/* Transcription panel - visible when session is active or transcript exists */}
+        {(sessionActive || transcript) && (
+          <div className="w-80 flex-shrink-0 border-l border-white/10">
+            <TranscriptionPanel
+              transcript={transcript}
+              isListening={isListening}
+              onStart={() => setShowSessionDialog(true)}
+              onStop={handleStopSession}
+              onClear={() => {
+                clearTranscript()
+                window.electronAPI.clearTranscript().catch(console.error)
+              }}
+              language={transcriptionLanguage}
+            />
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 

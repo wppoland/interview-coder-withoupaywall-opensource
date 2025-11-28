@@ -54,13 +54,44 @@ export interface ElectronAPI {
   getPlatform: () => string
   
   // New methods for OpenAI integration
-  getConfig: () => Promise<{ apiKey: string; model: string }>
-  updateConfig: (config: { apiKey?: string; model?: string }) => Promise<boolean>
+  getConfig: () => Promise<{ 
+    apiKey?: string
+    apiProvider?: "openai" | "gemini" | "anthropic"
+    extractionModel?: string
+    solutionModel?: string
+    debuggingModel?: string
+    language?: string
+    opacity?: number
+    transcriptionLanguage?: "pl-PL" | "en-US"
+    [key: string]: any
+  }>
+  updateConfig: (config: { 
+    apiKey?: string
+    apiProvider?: "openai" | "gemini" | "anthropic"
+    extractionModel?: string
+    solutionModel?: string
+    debuggingModel?: string
+    language?: string
+    opacity?: number
+    transcriptionLanguage?: "pl-PL" | "en-US"
+    [key: string]: any
+  }) => Promise<boolean>
   checkApiKey: () => Promise<boolean>
   validateApiKey: (apiKey: string) => Promise<{ valid: boolean; error?: string }>
   openLink: (url: string) => void
   onApiKeyInvalid: (callback: () => void) => () => void
   removeListener: (eventName: string, callback: (...args: any[]) => void) => void
+  
+  // Transcription methods
+  appendTranscript: (text: string) => Promise<{ success: boolean; error?: string }>
+  clearTranscript: () => Promise<{ success: boolean; error?: string }>
+  getTranscript: () => Promise<{ success: boolean; transcript: string; error?: string }>
+  replyToQuestion: () => Promise<{ success: boolean; answer?: string; error?: string }>
+  onTranscriptionReply: (callback: (data: { answer: string }) => void) => () => void
+  onTranscriptionReplyError: (callback: (data: { error: string }) => void) => () => void
+  onDeleteLastScreenshot: (callback: () => void) => () => void
+  deleteLastScreenshot: () => Promise<{ success: boolean; error?: string }>
+  onShowSettings: (callback: () => void) => () => void
 }
 
 declare global {

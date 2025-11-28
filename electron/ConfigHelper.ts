@@ -94,6 +94,24 @@ export class ConfigHelper extends EventEmitter {
     try {
       if (fs.existsSync(this.configPath)) {
         const configData = fs.readFileSync(this.configPath, 'utf8');
+        
+        // Check if the file appears to be corrupted (contains non-printable characters)
+        if (!/^[\x20-\x7E\s]*$/.test(configData) || configData.trim().length === 0) {
+          console.warn("Config file appears corrupted, recreating with defaults");
+          // Backup the corrupted file
+          try {
+            const backupPath = this.configPath + '.corrupted.' + Date.now();
+            fs.copyFileSync(this.configPath, backupPath);
+            console.log("Corrupted config backed up to:", backupPath);
+          } catch (backupErr) {
+            console.warn("Could not backup corrupted config:", backupErr);
+          }
+          // Remove corrupted file and create new one
+          fs.unlinkSync(this.configPath);
+          this.saveConfig(this.defaultConfig);
+          return this.defaultConfig;
+        }
+        
         const config = JSON.parse(configData);
         
         // Ensure apiProvider is a valid value
@@ -123,6 +141,25 @@ export class ConfigHelper extends EventEmitter {
       return this.defaultConfig;
     } catch (err) {
       console.error("Error loading config:", err);
+      // If JSON parsing failed, the file is corrupted - recreate it
+      if (err instanceof SyntaxError && fs.existsSync(this.configPath)) {
+        console.warn("Config file is corrupted (invalid JSON), recreating with defaults");
+        try {
+          // Backup the corrupted file
+          const backupPath = this.configPath + '.corrupted.' + Date.now();
+          fs.copyFileSync(this.configPath, backupPath);
+          console.log("Corrupted config backed up to:", backupPath);
+        } catch (backupErr) {
+          console.warn("Could not backup corrupted config:", backupErr);
+        }
+        // Remove corrupted file and create new one
+        try {
+          fs.unlinkSync(this.configPath);
+        } catch (unlinkErr) {
+          console.warn("Could not remove corrupted config:", unlinkErr);
+        }
+        this.saveConfig(this.defaultConfig);
+      }
       return this.defaultConfig;
     }
   }

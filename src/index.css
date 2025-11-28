@@ -2,6 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Make the entire window draggable */
+body, #root {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+/* Make interactive elements non-draggable */
+button, 
+input, 
+select, 
+textarea, 
+a, 
+[role="button"], 
+[contenteditable="true"],
+[class*="button"],
+[class*="input"],
+[class*="select"],
+[class*="dialog"],
+[class*="toast"],
+[class*="scroll"],
+[class*="overflow"] {
+  -webkit-app-region: no-drag;
+  user-select: auto;
+}
+
+/* Make scrollable containers non-draggable */
+div[class*="overflow"], 
+div[class*="scroll"] {
+  -webkit-app-region: no-drag;
+}
+
 /* Custom animations for UI elements */
 @keyframes fadeIn {
   from { opacity: 0; transform: translate(-50%, -48%); }

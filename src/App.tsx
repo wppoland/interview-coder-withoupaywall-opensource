@@ -239,7 +239,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <ToastContext.Provider value={{ showToast }}>
-          <div className="relative">
+          <div className="relative h-screen overflow-hidden">
             {isInitialized ? (
               hasApiKey ? (
                 <SubscribedApp

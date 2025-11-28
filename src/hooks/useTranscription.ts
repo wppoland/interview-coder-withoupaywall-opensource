@@ -49,13 +49,23 @@ declare global {
   }
 }
 
-export function useTranscription(transcriptionLanguage: 'pl-PL' | 'en-US' = 'en-US') {
+export function useTranscription(transcriptionLanguage: 'pl-PL' | 'en-US' = 'en-US', autoStart: boolean = false) {
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const languageRef = useRef(transcriptionLanguage)
+  const shouldRestartRef = useRef(false)
 
-  // Initialize speech recognition
+  // Update language ref when it changes
+  useEffect(() => {
+    languageRef.current = transcriptionLanguage
+    if (recognitionRef.current) {
+      recognitionRef.current.lang = transcriptionLanguage
+    }
+  }, [transcriptionLanguage])
+
+  // Initialize speech recognition (but don't start automatically)
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     
@@ -70,9 +80,9 @@ export function useTranscription(transcriptionLanguage: 'pl-PL' | 'en-US' = 'en-
     // Configure for continuous listening with selected language
     recognition.continuous = true
     recognition.interimResults = true
-    recognition.lang = transcriptionLanguage
+    recognition.lang = languageRef.current
     
-    console.log(`Speech recognition configured for language: ${transcriptionLanguage}`)
+    console.log(`Speech recognition configured for language: ${languageRef.current}`)
 
     recognition.onstart = () => {
       setIsListening(true)
@@ -113,11 +123,11 @@ export function useTranscription(transcriptionLanguage: 'pl-PL' | 'en-US' = 'en-
       console.error('Speech recognition error:', event.error)
       setError(`Speech recognition error: ${event.error}`)
       
-      // Auto-restart on certain errors
-      if (event.error === 'no-speech' || event.error === 'audio-capture') {
+      // Auto-restart on certain errors only if autoStart is enabled
+      if (autoStart && (event.error === 'no-speech' || event.error === 'audio-capture')) {
         // These are recoverable - restart after a short delay
         setTimeout(() => {
-          if (recognitionRef.current) {
+          if (recognitionRef.current && isListening) {
             try {
               recognition.start()
             } catch (e) {
@@ -132,28 +142,31 @@ export function useTranscription(transcriptionLanguage: 'pl-PL' | 'en-US' = 'en-
       setIsListening(false)
       console.log('Speech recognition ended')
       
-      // Auto-restart to keep listening continuously
-      // Only restart if we haven't explicitly stopped
-      setTimeout(() => {
-        if (recognitionRef.current) {
-          try {
-            recognition.start()
-          } catch (e) {
-            // Ignore errors when restarting - might already be starting
-            console.log('Recognition restart attempt:', e)
+      // Only auto-restart if autoStart is true and we should restart
+      if (autoStart && shouldRestartRef.current) {
+        setTimeout(() => {
+          if (recognitionRef.current) {
+            try {
+              recognition.start()
+            } catch (e) {
+              // Ignore errors when restarting - might already be starting
+              console.log('Recognition restart attempt:', e)
+            }
           }
-        }
-      }, 100)
+        }, 100)
+      }
     }
 
     recognitionRef.current = recognition
 
-    // Start listening automatically
-    try {
-      recognition.start()
-    } catch (e) {
-      console.error('Failed to start speech recognition:', e)
-      setError('Failed to start speech recognition')
+    // Start listening automatically only if autoStart is true
+    if (autoStart) {
+      try {
+        recognition.start()
+      } catch (e) {
+        console.error('Failed to start speech recognition:', e)
+        setError('Failed to start speech recognition')
+      }
     }
 
     // Cleanup
@@ -168,14 +181,17 @@ export function useTranscription(transcriptionLanguage: 'pl-PL' | 'en-US' = 'en-
       }
       recognitionRef.current = null
     }
-  }, [])
+  }, [autoStart, isListening])
 
   const startListening = useCallback(() => {
     if (recognitionRef.current && !isListening) {
       try {
+        shouldRestartRef.current = true
+        recognitionRef.current.lang = languageRef.current
         recognitionRef.current.start()
       } catch (e) {
         console.error('Failed to start listening:', e)
+        setError('Failed to start listening')
       }
     }
   }, [isListening])
@@ -183,7 +199,9 @@ export function useTranscription(transcriptionLanguage: 'pl-PL' | 'en-US' = 'en-
   const stopListening = useCallback(() => {
     if (recognitionRef.current && isListening) {
       try {
+        shouldRestartRef.current = false
         recognitionRef.current.stop()
+        recognitionRef.current.abort()
       } catch (e) {
         console.error('Failed to stop listening:', e)
       }

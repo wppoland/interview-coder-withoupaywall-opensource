@@ -210,6 +210,40 @@ export class ShortcutsHelper {
       }
     })
     
+    // Window resize shortcuts - make window bigger
+    globalShortcut.register("CommandOrControl+Shift+=", () => {
+      console.log("Command/Ctrl + Shift + = pressed. Expanding window.")
+      this.deps.resizeWindow(50, 50)
+    })
+    
+    // Window resize shortcuts - make window smaller
+    globalShortcut.register("CommandOrControl+Shift+-", () => {
+      console.log("Command/Ctrl + Shift + - pressed. Shrinking window.")
+      this.deps.resizeWindow(-50, -50)
+    })
+    
+    // Window resize shortcuts - width only
+    globalShortcut.register("CommandOrControl+Shift+Right", () => {
+      console.log("Command/Ctrl + Shift + Right pressed. Expanding width.")
+      this.deps.resizeWindow(50, 0)
+    })
+    
+    globalShortcut.register("CommandOrControl+Shift+Left", () => {
+      console.log("Command/Ctrl + Shift + Left pressed. Shrinking width.")
+      this.deps.resizeWindow(-50, 0)
+    })
+    
+    // Window resize shortcuts - height only
+    globalShortcut.register("CommandOrControl+Shift+Up", () => {
+      console.log("Command/Ctrl + Shift + Up pressed. Expanding height.")
+      this.deps.resizeWindow(0, 50)
+    })
+    
+    globalShortcut.register("CommandOrControl+Shift+Down", () => {
+      console.log("Command/Ctrl + Shift + Down pressed. Shrinking height.")
+      this.deps.resizeWindow(0, -50)
+    })
+    
     // Unregister shortcuts when quitting
     app.on("will-quit", () => {
       globalShortcut.unregisterAll()

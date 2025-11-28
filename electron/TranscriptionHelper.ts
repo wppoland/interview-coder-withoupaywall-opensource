@@ -184,7 +184,7 @@ export class TranscriptionHelper {
         console.log("Generated answer:", answer.substring(0, 100) + "...")
         return answer
       } else if (config.apiProvider === "gemini" && this.geminiApiKey) {
-        const response = await axios.post(
+        const response = await axios.default.post(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.geminiApiKey}`,
           {
             contents: [{
