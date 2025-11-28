@@ -27,7 +27,7 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
   const [showSessionDialog, setShowSessionDialog] = useState(false)
   const [sessionActive, setSessionActive] = useState(false)
   const [hasShownInitialDialog, setHasShownInitialDialog] = useState(false)
-  
+
   // Show language selection dialog on first mount if session is not active
   useEffect(() => {
     if (!hasShownInitialDialog && !sessionActive) {
@@ -39,53 +39,52 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
       return () => clearTimeout(timer)
     }
   }, [hasShownInitialDialog, sessionActive])
-  
-  // Initialize transcription with selected language (but don't start automatically)
-  const { 
-    transcript, 
-    error: transcriptionError, 
-    isListening, 
-    startListening, 
-    stopListening, 
-    clearTranscript 
-  } = useTranscription(transcriptionLanguage, false)
-  
+
+  // Initialize transcription with selected language
+  // Pass sessionActive as autoStart to ensure it restarts if it stops while session is active
+  const {
+    transcript,
+    error: transcriptionError,
+    isListening,
+    startListening,
+    stopListening,
+    clearTranscript
+  } = useTranscription(transcriptionLanguage, sessionActive)
+
   // Debug: log when transcription state changes
   useEffect(() => {
     console.log('Transcription state changed:', { isListening, transcriptionLanguage, error: transcriptionError })
   }, [isListening, transcriptionLanguage, transcriptionError])
-  
+
   // Handle session start
   const handleStartSession = (language: "pl-PL" | "en-US") => {
     console.log('handleStartSession called with language:', language)
     setTranscriptionLanguage(language)
     setSessionActive(true)
+
     // Clear previous transcript
     clearTranscript()
     window.electronAPI.clearTranscript().catch(console.error)
-    // Start listening after language is updated
-    // Use a longer delay to ensure language is updated in the hook
-    setTimeout(() => {
-      console.log('Calling startListening after timeout')
-      startListening()
-    }, 800) // Increased delay to ensure hook is ready and language is updated
+
+    // We don't need to call startListening() manually here because we passed 
+    // sessionActive to useTranscription, which will trigger the effect to start listening
   }
-  
+
   // Handle session stop
   const handleStopSession = () => {
     stopListening()
     setSessionActive(false)
     showToast("Sesja zakończona", "Transkrypcja została zatrzymana", "success")
   }
-  
+
   // Show toast when transcription starts (only when session is active)
   const hasShownStartToast = useRef(false)
   useEffect(() => {
     if (isListening && sessionActive && !hasShownStartToast.current) {
       hasShownStartToast.current = true
       showToast(
-        "Sesja rozpoczęta", 
-        `Transkrypcja w języku ${transcriptionLanguage === "pl-PL" ? "polskim" : "angielskim"}. Naciśnij Cmd+Shift+M aby odpowiedzieć na pytania.`, 
+        "Sesja rozpoczęta",
+        `Transkrypcja w języku ${transcriptionLanguage === "pl-PL" ? "polskim" : "angielskim"}. Naciśnij Cmd+Shift+M aby odpowiedzieć na pytania.`,
         "success"
       )
     }
@@ -93,38 +92,38 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
       hasShownStartToast.current = false
     }
   }, [isListening, transcriptionLanguage, sessionActive, showToast])
-  
+
   // Listen for transcription reply
   useEffect(() => {
     const unsubscribeReply = window.electronAPI.onTranscriptionReply((data: { answer: string }) => {
       showToast("Answer Generated", data.answer.substring(0, 100) + "...", "success")
       console.log("Transcription reply:", data.answer)
     })
-    
+
     const unsubscribeError = window.electronAPI.onTranscriptionReplyError((data: { error: string }) => {
       showToast("Error", data.error, "error")
     })
-    
+
     return () => {
       unsubscribeReply()
       unsubscribeError()
     }
   }, [showToast])
-  
+
   // Log transcription errors and show user-friendly messages
   useEffect(() => {
     if (transcriptionError) {
       console.warn("Transcription error:", transcriptionError)
       if (transcriptionError.includes("not supported")) {
         showToast(
-          "Transcription Not Available", 
-          "Speech recognition is not supported in this browser. Please use Chrome or Edge.", 
+          "Transcription Not Available",
+          "Speech recognition is not supported in this browser. Please use Chrome or Edge.",
           "error"
         )
       } else if (transcriptionError.includes("permission") || transcriptionError.includes("microphone")) {
         showToast(
-          "Microphone Permission Required", 
-          "Please enable microphone access in System Settings > Privacy & Security > Microphone", 
+          "Microphone Permission Required",
+          "Please enable microphone access in System Settings > Privacy & Security > Microphone",
           "error"
         )
       }
@@ -154,7 +153,8 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
     }
   }, [])
 
-  // Dynamically update the window size
+  // Dynamically update the window size - DISABLED to enforce half-screen mode
+  /*
   useEffect(() => {
     if (!containerRef.current) return
 
@@ -195,6 +195,7 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
       clearTimeout(delayedUpdate)
     }
   }, [view])
+  */
 
   // Listen for events that might switch views or show errors
   useEffect(() => {
@@ -251,7 +252,7 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
         onStartSession={handleStartSession}
         onClose={() => setShowSessionDialog(false)}
       />
-      
+
       <div ref={containerRef} className="h-full flex overflow-hidden">
         {/* Main content area */}
         <div className="flex-1 min-w-0 overflow-auto">
@@ -272,7 +273,7 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
             />
           ) : null}
         </div>
-        
+
         {/* Transcription panel - always visible, integrated into main window */}
         <div className="w-80 flex-shrink-0 border-l border-white/10 bg-black">
           <TranscriptionPanel
@@ -293,6 +294,7 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
               clearTranscript()
               window.electronAPI.clearTranscript().catch(console.error)
             }}
+            onSelectLanguage={() => setShowSessionDialog(true)}
             language={transcriptionLanguage}
           />
         </div>

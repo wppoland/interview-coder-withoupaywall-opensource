@@ -23,12 +23,21 @@ export function TranscriptionPanel({
 }: TranscriptionPanelProps) {
   return (
     <div className="bg-black border-l border-white/10 h-full flex flex-col">
-      <div className="p-3 border-b border-white/10 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />
-          <span className="text-sm text-white/80 font-medium">
-            Transkrypt {language === "pl-PL" ? "(Polski)" : "(English)"}
-          </span>
+      <div className="p-3 border-b border-white/10">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />
+            <span className="text-sm text-white/80 font-medium">
+              Transkrypt {language === "pl-PL" ? "(Polski)" : "(English)"}
+            </span>
+          </div>
+          <button
+            onClick={onSelectLanguage}
+            className="text-xs text-white/60 hover:text-white/90 px-2 py-1 rounded hover:bg-white/10 transition-colors"
+            title="Zmień język"
+          >
+            {language === "pl-PL" ? "🇵🇱" : "🇺🇸"}
+          </button>
         </div>
         <div className="flex items-center gap-1">
           {isListening ? (

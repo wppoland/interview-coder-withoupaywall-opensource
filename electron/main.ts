@@ -234,7 +234,7 @@ async function createWindow(): Promise<void> {
 
   // Calculate 1/2 of screen size
   const windowWidth = Math.floor(workArea.width / 2)
-  const windowHeight = Math.floor(workArea.height / 2)
+  const windowHeight = Math.floor(workArea.height / 2) // Half height as requested
 
   const windowSettings: BrowserWindowConstructorOptions = {
     width: windowWidth,
@@ -243,8 +243,9 @@ async function createWindow(): Promise<void> {
     minHeight: 300,
     maxWidth: undefined, // Allow resizing to any width
     maxHeight: undefined, // Allow resizing to any height
-    x: state.currentX,
-    y: 50,
+    x: 0, // Start at the left edge
+    y: 0, // Start at the top edge
+
     alwaysOnTop: true,
     webPreferences: {
       nodeIntegration: false,
@@ -311,7 +312,7 @@ async function createWindow(): Promise<void> {
     // In production, load from the built files
     const indexPath = path.join(__dirname, "../dist/index.html")
     console.log("Loading production build:", indexPath)
-    
+
     if (fs.existsSync(indexPath)) {
       state.mainWindow.loadFile(indexPath)
     } else {
@@ -321,12 +322,12 @@ async function createWindow(): Promise<void> {
 
   // Configure window behavior
   state.mainWindow.webContents.setZoomFactor(1)
-  
+
   // Enable window dragging even without frame - make entire window draggable
   // This will be handled via CSS in the renderer, but we ensure the window is movable
   state.mainWindow.setMovable(true)
   state.mainWindow.setResizable(true)
-  
+
   // DevTools disabled - uncomment the line below if you need to debug
   // if (isDev) {
   //   state.mainWindow.webContents.openDevTools()
@@ -342,7 +343,7 @@ async function createWindow(): Promise<void> {
         return { action: "deny" }; // Do not open this URL in a new Electron window
       }
     } catch (error) {
-      console.error("Invalid URL %d in setWindowOpenHandler: %d" , url , error);
+      console.error("Invalid URL %d in setWindowOpenHandler: %d", url, error);
       return { action: "deny" }; // Deny access as URL string is malformed or invalid
     }
     return { action: "allow" };
@@ -365,9 +366,8 @@ async function createWindow(): Promise<void> {
 
     // Show in Dock so user can easily quit the application
     state.mainWindow.setSkipTaskbar(false)
-    if (app.dock) {
-      app.dock.show()
-    }
+    // app.dock.show() removed to fix "SetApplicationIsDaemon" error on some macOS versions
+    // If LSUIElement is set in Info.plist, calling this might cause conflicts
 
     // Disable window shadow
     state.mainWindow.setHasShadow(false)
@@ -389,11 +389,11 @@ async function createWindow(): Promise<void> {
   state.currentX = bounds.x
   state.currentY = bounds.y
   state.isWindowVisible = true
-  
+
   // Always keep window visible and listening
   const savedOpacity = configHelper.getOpacity();
   console.log(`Initial opacity from config: ${savedOpacity}`);
-  
+
   // Always show the window - keep it visible all the time
   const finalOpacity = savedOpacity > 0.1 ? savedOpacity : 1.0;
   console.log(`Setting initial opacity to ${finalOpacity} and keeping window visible`);
@@ -439,11 +439,11 @@ function showMainWindow(): void {
     const primaryDisplay = screen.getPrimaryDisplay();
     const workArea = primaryDisplay.workAreaSize;
     const bounds = state.mainWindow.getBounds();
-    
+
     // If window is off-screen or invalid position, reset to center
-    if (bounds.x < -bounds.width || bounds.x > workArea.width || 
-        bounds.y < -bounds.height || bounds.y > workArea.height ||
-        !state.windowPosition) {
+    if (bounds.x < -bounds.width || bounds.x > workArea.width ||
+      bounds.y < -bounds.height || bounds.y > workArea.height ||
+      !state.windowPosition) {
       const windowWidth = state.windowSize?.width || 800;
       const windowHeight = state.windowSize?.height || 600;
       const centerX = Math.floor(workArea.width / 2 - windowWidth / 2);
@@ -456,31 +456,39 @@ function showMainWindow(): void {
         ...state.windowSize
       });
     }
-    
+
     // Configure window properties for visibility BEFORE showing
     state.mainWindow.setIgnoreMouseEvents(false);
     state.mainWindow.setVisibleOnAllWorkspaces(true, {
       visibleOnFullScreen: true
     });
     state.mainWindow.setAlwaysOnTop(true, "screen-saver", 1);
-    
+
     // Disable content protection completely when showing (don't re-enable immediately)
     state.mainWindow.setContentProtection(false);
-    
+
     // Set opacity from config and show the window
     const savedOpacity = configHelper.getOpacity();
     const finalOpacity = savedOpacity > 0.1 ? savedOpacity : 0.95;
     state.mainWindow.setOpacity(finalOpacity);
+
+    // Force window size to be half-screen width and half-screen height
+    // This overrides any saved state or auto-resize attempts
+    const windowWidth = Math.floor(workArea.width / 2);
+    const windowHeight = Math.floor(workArea.height / 2);
+    state.mainWindow.setSize(windowWidth, windowHeight);
+    state.mainWindow.setPosition(0, 0); // Ensure it's at top-left
+
     state.mainWindow.show();
     state.mainWindow.focus();
-    
+
     // Bring to front forcefully
     state.mainWindow.moveTop();
-    
+
     // Log window position for debugging
     const finalBounds = state.mainWindow.getBounds();
     console.log(`Window shown: position (${finalBounds.x}, ${finalBounds.y}), size ${finalBounds.width}x${finalBounds.height}, opacity: ${state.mainWindow.getOpacity()}`);
-    
+
     state.isWindowVisible = true;
   }
 }
@@ -537,36 +545,12 @@ function moveWindowVertical(updateFn: (y: number) => number): void {
 
 // Window dimension functions
 // This is used for automatic content-based sizing, but should not override manual resizing
+// Window dimension functions
+// This is used for automatic content-based sizing, but should not override manual resizing
 function setWindowDimensions(width: number, height: number): void {
-  if (!state.mainWindow?.isDestroyed()) {
-    // Don't auto-resize if user manually resized the window
-    if (state.isManuallyResized) {
-      console.log('Skipping auto-resize - window was manually resized by user')
-      return
-    }
-    
-    const [currentX, currentY] = state.mainWindow.getPosition()
-    const primaryDisplay = screen.getPrimaryDisplay()
-    const workArea = primaryDisplay.workAreaSize
-    
-    // Don't limit width - allow full screen width if needed
-    // Only ensure it doesn't exceed screen bounds
-    const maxWidth = workArea.width - 20 // Small margin from screen edge
-    const requestedWidth = width + 32
-
-    state.mainWindow.setBounds({
-      x: Math.min(currentX, workArea.width - Math.min(requestedWidth, maxWidth)),
-      y: currentY,
-      width: Math.min(requestedWidth, maxWidth),
-      height: Math.ceil(height)
-    })
-    
-    // Update state to reflect new size
-    state.windowSize = { 
-      width: Math.min(requestedWidth, maxWidth), 
-      height: Math.ceil(height) 
-    }
-  }
+  // Completely disable auto-resizing from frontend to enforce fixed window size
+  // console.log('Auto-resize requested but disabled to enforce fixed layout')
+  return
 }
 
 // Window resize function
@@ -575,17 +559,17 @@ function resizeWindow(deltaWidth: number, deltaHeight: number): void {
     const bounds = state.mainWindow.getBounds()
     const primaryDisplay = screen.getPrimaryDisplay()
     const workArea = primaryDisplay.workAreaSize
-    
+
     const newWidth = Math.max(400, Math.min(workArea.width, bounds.width + deltaWidth))
     const newHeight = Math.max(300, Math.min(workArea.height, bounds.height + deltaHeight))
-    
+
     state.mainWindow.setBounds({
       x: bounds.x,
       y: bounds.y,
       width: newWidth,
       height: newHeight
     })
-    
+
     // Update state and mark as manually resized
     state.windowSize = { width: newWidth, height: newHeight }
     state.isManuallyResized = true
@@ -616,30 +600,25 @@ async function initializeApp() {
     applicationName: "Int",
     applicationVersion: "1.0.19"
   });
-  
+
   // Ensure the app does NOT auto-start on login/wake (macOS)
-  if (process.platform === 'darwin') {
-    try {
-      app.setLoginItemSettings({ openAtLogin: false, openAsHidden: false });
-    } catch (e) {
-      console.warn('Could not set login item settings:', e);
-    }
-  }
-  
+  // Removed app.setLoginItemSettings as it was causing errors on some macOS versions
+  // and we don't want to enforce this setting anyway
+
   try {
     // Set custom cache directory to prevent permission issues
     const appDataPath = path.join(app.getPath('appData'), 'interview-coder-v1')
     const sessionPath = path.join(appDataPath, 'session')
     const tempPath = path.join(appDataPath, 'temp')
     const cachePath = path.join(appDataPath, 'cache')
-    
+
     // Create directories if they don't exist
     for (const dir of [appDataPath, sessionPath, tempPath, cachePath]) {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true })
       }
     }
-    
+
     app.setPath('userData', appDataPath)
     // Do not set unsupported 'sessionData'; pre-create expected subdirectories instead
     app.setPath('temp', tempPath)
@@ -651,10 +630,10 @@ async function initializeApp() {
     const httpCacheDataSession = path.join(sessionPath, 'Cache', 'Cache_Data')
     const sharedDictCacheAppData = path.join(appDataPath, 'Shared Dictionary', 'cache')
     const httpCacheDataAppData = path.join(appDataPath, 'Cache', 'Cache_Data')
-    
+
     for (const dir of [
-      sessionPath, 
-      sharedDictCacheSession, 
+      sessionPath,
+      sharedDictCacheSession,
       httpCacheDataSession,
       sharedDictCacheAppData,
       httpCacheDataAppData
@@ -663,16 +642,16 @@ async function initializeApp() {
         fs.mkdirSync(dir, { recursive: true })
       }
     }
-      
+
     loadEnvVariables()
-    
+
     // Ensure a configuration file exists
     if (!configHelper.hasApiKey()) {
       console.log("No API key found in configuration. User will need to set up.")
     }
-    
+
     initializeHelpers()
-    
+
     // Listen for config updates to update window opacity in real-time
     configHelper.on('config-updated', (newConfig) => {
       if (newConfig.opacity !== undefined && state.mainWindow && !state.mainWindow.isDestroyed()) {
@@ -681,7 +660,7 @@ async function initializeApp() {
         console.log(`Window opacity updated to ${opacity}`);
       }
     });
-    
+
     // Also listen for opacity changes specifically (even if config-updated is not emitted)
     // We'll handle this in the updateConfig handler
     initializeIpcHandlers({
@@ -738,7 +717,7 @@ app.on("open-url", (event, url) => {
 // Handle second instance (removed auth callback handling)
 app.on("second-instance", (event, commandLine) => {
   console.log("second-instance event received:", commandLine)
-  
+
   // Focus or create the main window - always ensure it's visible
   if (!state.mainWindow) {
     createWindow()

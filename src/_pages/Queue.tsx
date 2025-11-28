@@ -68,7 +68,8 @@ const Queue: React.FC<QueueProps> = ({
   }
 
   useEffect(() => {
-    // Height update logic
+    /*
+    // Height update logic - DISABLED to enforce fixed window size
     const updateDimensions = () => {
       if (contentRef.current) {
         let contentHeight = contentRef.current.scrollHeight
@@ -89,6 +90,7 @@ const Queue: React.FC<QueueProps> = ({
       resizeObserver.observe(contentRef.current)
     }
     updateDimensions()
+    */
 
     // Set up event listeners
     const cleanupFunctions = [
@@ -122,7 +124,7 @@ const Queue: React.FC<QueueProps> = ({
     ]
 
     return () => {
-      resizeObserver.disconnect()
+      // resizeObserver.disconnect()
       cleanupFunctions.forEach((cleanup) => cleanup())
     }
   }, [isTooltipVisible, tooltipHeight, screenshots])
