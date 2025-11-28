@@ -158,8 +158,54 @@ The DMG file will be in the `release/` directory as:
 ### App Won't Quit?
 - Use `Cmd + Shift + Q` for emergency force quit
 - Right-click the Dock icon → Quit
-- **Force Quit Applications** (`Cmd + Option + Esc`) → Look for "Interview Coder" → Force Quit
-- Activity Monitor → Search for "Interview Coder" → Force Quit
+- **Force Quit Applications** (`Cmd + Option + Esc`) → Look for "Int" → Force Quit
+- Activity Monitor → Search for "Int" → Force Quit
+
+### Killing "Electron Helper (Plugin)" Processes
+
+If you see "Electron Helper (Plugin)" processes using resources and can't identify which app they belong to:
+
+**Step 1: Identify all Electron Helper (Plugin) processes and their parent apps**
+```bash
+ps -axo pid,ppid,comm | grep -i "Electron Helper (Plugin)" | grep -v grep | while read pid ppid comm; do
+  parent=$(ps -o comm= -p $ppid 2>/dev/null | head -1)
+  echo "PID=$pid PPID=$ppid PARENT=$parent"
+done
+```
+
+**Step 2: Find processes belonging to "Int" app**
+```bash
+# Look for processes with "Int" or "interview-coder" in their path
+ps aux | grep -i "Int\|interview-coder" | grep -v grep | grep -v "Brave\|Cursor\|Slack"
+```
+
+**Step 3: Kill all processes for a specific PID (replace 12345 with actual PID)**
+```bash
+PID=12345
+# First, try graceful termination
+kill -TERM $PID
+kill -TERM $(ps -o ppid= -p $PID | tr -d ' ')
+
+# Wait a few seconds, then force kill if needed
+sleep 2
+kill -9 $PID 2>/dev/null
+kill -9 $(ps -o ppid= -p $PID | tr -d ' ') 2>/dev/null
+```
+
+**Step 4: Kill all Electron Helper processes (BE CAREFUL - kills ALL Electron apps)**
+```bash
+# Only use this if you want to kill ALL Electron apps (Brave, Cursor, Slack, etc.)
+pkill -9 "Electron Helper (Plugin)"
+```
+
+**Step 5: Kill specific app by bundle path (safest method)**
+```bash
+# Find the bundle path
+lsof -p <PID> | grep "\.app/Contents/MacOS" | head -1
+
+# If it's the Int app, kill it
+pkill -9 -f "interview-coder\|Int\.app"
+```
 
 ### Build Errors?
 ```bash
